@@ -5,6 +5,7 @@ interface AuthContextType {
   user: any
   signUp: (email: string, password: string) => Promise<{ error: any }>
   signIn: (email: string, password: string) => Promise<{ error: any }>
+  registerWorkspace: (data: any) => Promise<{ error: any }>
   signOut: () => void
   loading: boolean
   selectedEmpresaId: string | null
@@ -59,6 +60,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
+  const registerWorkspace = async (data: any) => {
+    try {
+      await pb.send('/backend/v1/auth/register', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      })
+      return await signIn(data.email, data.password)
+    } catch (error) {
+      return { error }
+    }
+  }
+
   const signOut = () => {
     pb.authStore.clear()
     setSelectedEmpresaId(null)
@@ -66,7 +79,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <AuthContext.Provider
-      value={{ user, signUp, signIn, signOut, loading, selectedEmpresaId, setSelectedEmpresaId }}
+      value={{
+        user,
+        signUp,
+        signIn,
+        registerWorkspace,
+        signOut,
+        loading,
+        selectedEmpresaId,
+        setSelectedEmpresaId,
+      }}
     >
       {children}
     </AuthContext.Provider>

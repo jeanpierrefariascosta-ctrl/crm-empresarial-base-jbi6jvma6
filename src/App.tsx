@@ -12,6 +12,7 @@ import Leads from './pages/vendas/Leads'
 import Clientes from './pages/vendas/Clientes'
 import Tarefas from './pages/projetos/Tarefas'
 import Campanhas from './pages/marketing/Campanhas'
+import CampanhaPublica from './pages/marketing/CampanhaPublica'
 import NotFound from './pages/NotFound'
 
 const App = () => (
@@ -23,6 +24,7 @@ const App = () => (
           <Sonner />
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/campanha/:id" element={<CampanhaPublica />} />
             <Route element={<Layout />}>
               <Route path="/" element={<Index />} />
               <Route path="/vendas/leads" element={<Leads />} />
