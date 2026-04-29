@@ -1,6 +1,7 @@
 migrate(
   (app) => {
     const leads = app.findCollectionByNameOrId('leads')
+    const empresas = app.findCollectionByNameOrId('empresas')
 
     leads.fields.add(new DateField({ name: 'data_fechamento_previsto' }))
     leads.fields.add(new NumberField({ name: 'valor_confirmado' }))
@@ -26,7 +27,7 @@ migrate(
           name: 'empresa_id',
           type: 'relation',
           required: true,
-          collectionId: 'empresas',
+          collectionId: empresas.id,
           maxSelect: 1,
         },
         { name: 'lead_id', type: 'relation', required: true, collectionId: leads.id, maxSelect: 1 },
@@ -55,7 +56,7 @@ migrate(
           name: 'empresa_id',
           type: 'relation',
           required: true,
-          collectionId: 'empresas',
+          collectionId: empresas.id,
           maxSelect: 1,
         },
         { name: 'lead_id', type: 'relation', required: true, collectionId: leads.id, maxSelect: 1 },
@@ -89,7 +90,7 @@ migrate(
           name: 'empresa_id',
           type: 'relation',
           required: true,
-          collectionId: 'empresas',
+          collectionId: empresas.id,
           maxSelect: 1,
         },
         { name: 'lead_id', type: 'relation', required: true, collectionId: leads.id, maxSelect: 1 },
