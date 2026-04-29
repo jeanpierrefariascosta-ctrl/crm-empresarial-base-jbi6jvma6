@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
 import pb from '@/lib/pocketbase/client'
-import { Megaphone, CheckCircle2 } from 'lucide-react'
+import { Megaphone, CheckCircle2, Search, Loader2 } from 'lucide-react'
+import { isValidCNPJ, maskCnpj } from '@/lib/utils'
 
 export default function CampanhaPublica() {
   const { id } = useParams()
@@ -19,6 +20,9 @@ export default function CampanhaPublica() {
     cnpj: '',
   })
   const [isLoading, setIsLoading] = useState(false)
+  const [isCheckingCnpj, setIsCheckingCnpj] = useState(false)
+  const [cnpjNotFound, setCnpjNotFound] = useState(false)
+  const [manualEntry, setManualEntry] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
   const { toast } = useToast()
 
@@ -32,6 +36,55 @@ export default function CampanhaPublica() {
         })
     }
   }, [id, toast])
+
+  const checkCnpjApi = async () => {
+    const cleanCnpj = formData.cnpj.replace(/\D/g, '')
+    if (cleanCnpj.length < 14) return
+
+    if (!isValidCNPJ(cleanCnpj)) {
+      toast({ variant: 'destructive', title: 'CNPJ inválido' })
+      return
+    }
+
+    setIsCheckingCnpj(true)
+    setCnpjNotFound(false)
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`)
+      if (res.ok) {
+        const data = await res.json()
+        setFormData((prev) => ({ ...prev, razao_social: data.razao_social }))
+        setManualEntry(true) // auto-show field as we have the data
+        toast({ title: 'CNPJ encontrado', description: 'Dados da empresa preenchidos.' })
+      } else if (res.status === 404) {
+        setCnpjNotFound(true)
+        toast({
+          variant: 'destructive',
+          title: 'CNPJ não encontrado',
+          description: 'CNPJ não encontrado na base da Receita Federal',
+        })
+      } else {
+        toast({
+          variant: 'destructive',
+          title: 'Erro na busca',
+          description: 'Tente novamente mais tarde.',
+        })
+      }
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro de conexão',
+        description: 'Não foi possível buscar o CNPJ.',
+      })
+    } finally {
+      setIsCheckingCnpj(false)
+    }
+  }
+
+  const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const masked = maskCnpj(e.target.value)
+    setFormData((prev) => ({ ...prev, cnpj: masked }))
+    if (cnpjNotFound) setCnpjNotFound(false)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -110,20 +163,59 @@ export default function CampanhaPublica() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Nome da Empresa</Label>
-              <Input
-                required
-                value={formData.razao_social}
-                onChange={(e) => setFormData({ ...formData, razao_social: e.target.value })}
-              />
+              <Label>CNPJ da Empresa</Label>
+              <div className="flex gap-2">
+                <Input
+                  value={formData.cnpj}
+                  onChange={handleCnpjChange}
+                  placeholder="00.000.000/0000-00"
+                  maxLength={18}
+                  disabled={isCheckingCnpj}
+                />
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={checkCnpjApi}
+                  disabled={isCheckingCnpj || formData.cnpj.length < 18}
+                  className="min-w-[100px]"
+                >
+                  {isCheckingCnpj ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Search className="h-4 w-4 mr-2" /> Buscar
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>CNPJ (Opcional)</Label>
-              <Input
-                value={formData.cnpj}
-                onChange={(e) => setFormData({ ...formData, cnpj: e.target.value })}
-              />
-            </div>
+
+            {cnpjNotFound && !manualEntry && (
+              <div className="bg-destructive/10 text-destructive p-3 rounded-md text-sm space-y-3 animate-fade-in">
+                <p className="font-medium">CNPJ não encontrado na base da Receita Federal.</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setManualEntry(true)}
+                  className="w-full border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
+                >
+                  Criar cliente manualmente
+                </Button>
+              </div>
+            )}
+
+            {(manualEntry || !cnpjNotFound) && (
+              <div className="space-y-2 animate-fade-in-up">
+                <Label>Nome da Empresa</Label>
+                <Input
+                  required
+                  value={formData.razao_social}
+                  onChange={(e) => setFormData({ ...formData, razao_social: e.target.value })}
+                  placeholder="Razão Social ou Nome Fantasia"
+                />
+              </div>
+            )}
             <Button className="w-full mt-4" type="submit" disabled={isLoading}>
               {isLoading ? 'Enviando...' : 'Quero saber mais'}
             </Button>

@@ -6,54 +6,23 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { useToast } from '@/hooks/use-toast'
-import { Briefcase, Building, ChevronRight, ChevronLeft, User, Lock, Mail } from 'lucide-react'
+import {
+  Briefcase,
+  Building,
+  ChevronRight,
+  ChevronLeft,
+  User,
+  Lock,
+  Mail,
+  Loader2,
+} from 'lucide-react'
 import { extractFieldErrors } from '@/lib/pocketbase/errors'
-
-function isValidCNPJ(cnpj: string) {
-  cnpj = cnpj.replace(/[^\d]+/g, '')
-  if (cnpj === '') return false
-  if (cnpj.length !== 14) return false
-  if (/^(\d)\1+$/.test(cnpj)) return false
-
-  let size = cnpj.length - 2
-  let numbers = cnpj.substring(0, size)
-  const digits = cnpj.substring(size)
-  let sum = 0
-  let pos = size - 7
-  for (let i = size; i >= 1; i--) {
-    sum += parseInt(numbers.charAt(size - i)) * pos--
-    if (pos < 2) pos = 9
-  }
-  let result = sum % 11 < 2 ? 0 : 11 - (sum % 11)
-  if (result !== parseInt(digits.charAt(0))) return false
-
-  size = size + 1
-  numbers = cnpj.substring(0, size)
-  sum = 0
-  pos = size - 7
-  for (let i = size; i >= 1; i--) {
-    sum += parseInt(numbers.charAt(size - i)) * pos--
-    if (pos < 2) pos = 9
-  }
-  result = sum % 11 < 2 ? 0 : 11 - (sum % 11)
-  if (result !== parseInt(digits.charAt(1))) return false
-
-  return true
-}
-
-const maskCnpj = (value: string) => {
-  return value
-    .replace(/\D/g, '')
-    .replace(/^(\d{2})(\d)/, '$1.$2')
-    .replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3')
-    .replace(/\.(\d{3})(\d)/, '.$1/$2')
-    .replace(/(\d{4})(\d)/, '$1-$2')
-    .substring(0, 18)
-}
+import { isValidCNPJ, maskCnpj } from '@/lib/utils'
 
 export default function Signup() {
   const [step, setStep] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
+  const [isCheckingCnpj, setIsCheckingCnpj] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   const [regData, setRegData] = useState({
@@ -76,6 +45,8 @@ export default function Signup() {
         setErrors((prev) => ({ ...prev, cnpj: 'CNPJ inválido' }))
         return
       }
+
+      setIsCheckingCnpj(true)
       try {
         const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`)
         if (res.ok) {
@@ -83,16 +54,28 @@ export default function Signup() {
           setRegData((prev) => ({ ...prev, razao_social: data.razao_social }))
           setErrors((prev) => ({ ...prev, cnpj: '' }))
         } else if (res.status === 404) {
-          const errorData = await res.json().catch(() => null)
           toast({
             variant: 'destructive',
             title: 'CNPJ não encontrado',
-            description: errorData?.message || 'CNPJ não encontrado na Receita Federal.',
+            description: 'CNPJ não encontrado na base da Receita Federal',
           })
-          setRegData((prev) => ({ ...prev, razao_social: '' }))
+          setErrors((prev) => ({ ...prev, cnpj: 'CNPJ não encontrado na base da Receita Federal' }))
+          // We preserve the typed values so the user can correct them manually, instead of clearing them
+        } else {
+          toast({
+            variant: 'destructive',
+            title: 'Erro ao buscar CNPJ',
+            description: 'Tente novamente mais tarde.',
+          })
         }
       } catch {
-        // Ignore network errors gracefully
+        toast({
+          variant: 'destructive',
+          title: 'Erro de conexão',
+          description: 'Não foi possível buscar os dados do CNPJ.',
+        })
+      } finally {
+        setIsCheckingCnpj(false)
       }
     }
   }
@@ -208,12 +191,16 @@ export default function Signup() {
                     <Input
                       required
                       placeholder="00.000.000/0000-00"
-                      className={`pl-9 ${errors.cnpj ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
+                      className={`pl-9 pr-10 ${errors.cnpj ? 'border-red-500 focus-visible:ring-red-500' : ''}`}
                       value={regData.cnpj}
                       onChange={handleCnpjChange}
                       onBlur={() => checkCnpjApi(regData.cnpj)}
                       maxLength={18}
+                      disabled={isCheckingCnpj}
                     />
+                    {isCheckingCnpj && (
+                      <Loader2 className="absolute right-3 top-3 h-4 w-4 text-muted-foreground animate-spin" />
+                    )}
                   </div>
                   {errors.cnpj && <p className="text-sm text-red-500 font-medium">{errors.cnpj}</p>}
                 </div>
