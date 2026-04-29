@@ -1,6 +1,6 @@
-/* 404 Page - Displays when a user attempts to access a non-existent route - translate to the language of the user */
-import { useLocation } from 'react-router-dom'
+import { useLocation, Link } from 'react-router-dom'
 import { useEffect } from 'react'
+import { Button } from '@/components/ui/button'
 
 const NotFound = () => {
   const location = useLocation()
@@ -10,14 +10,14 @@ const NotFound = () => {
   }, [location.pathname])
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">404</h1>
-        <p className="text-xl text-gray-600 mb-4">Oops! Page not found</p>
-        <a href="/" className="text-blue-500 hover:text-blue-700 underline">
-          Return to Home
-        </a>
-      </div>
+    <div className="flex flex-col items-center justify-center h-[70vh] text-center">
+      <h1 className="text-6xl font-bold mb-4 text-primary">404</h1>
+      <p className="text-xl text-muted-foreground mb-8">
+        Ops! A página que você tentou acessar não foi encontrada.
+      </p>
+      <Button asChild>
+        <Link to="/">Voltar ao Início</Link>
+      </Button>
     </div>
   )
 }
