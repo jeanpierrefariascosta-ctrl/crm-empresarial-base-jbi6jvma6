@@ -43,18 +43,35 @@ export default function Login() {
   }
 
   const checkCnpj = async () => {
-    if (regData.cnpj.length >= 14) {
+    const cleanCnpj = regData.cnpj.replace(/\D/g, '')
+    if (cleanCnpj.length >= 14) {
       try {
-        const res = await fetch(
-          `https://brasilapi.com.br/api/cnpj/v1/${regData.cnpj.replace(/\D/g, '')}`,
-        )
+        const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`)
         if (res.ok) {
           const data = await res.json()
           setRegData((prev) => ({ ...prev, razao_social: data.razao_social }))
           toast({ title: 'Empresa encontrada', description: data.razao_social })
+        } else if (res.status === 404) {
+          const errorData = await res.json().catch(() => null)
+          toast({
+            variant: 'destructive',
+            title: 'CNPJ não encontrado',
+            description: errorData?.message || 'CNPJ não encontrado na Receita Federal.',
+          })
+          setRegData((prev) => ({ ...prev, razao_social: '' }))
+        } else {
+          toast({
+            variant: 'destructive',
+            title: 'Erro na busca',
+            description: 'Ocorreu um erro ao buscar o CNPJ. Tente novamente.',
+          })
         }
       } catch {
-        /* intentionally ignored */
+        toast({
+          variant: 'destructive',
+          title: 'Erro de conexão',
+          description: 'Verifique sua conexão e tente novamente.',
+        })
       }
     }
   }
