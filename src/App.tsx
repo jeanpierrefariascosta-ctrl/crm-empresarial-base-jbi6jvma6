@@ -7,6 +7,7 @@ import { AuthProvider } from '@/hooks/use-auth'
 
 import Layout from './components/Layout'
 import Login from './pages/Login'
+import Signup from './pages/Signup'
 import Index from './pages/Index'
 import Leads from './pages/vendas/Leads'
 import Clientes from './pages/vendas/Clientes'
@@ -24,6 +25,7 @@ const App = () => (
           <Sonner />
           <Routes>
             <Route path="/login" element={<Login />} />
+            <Route path="/signup" element={<Signup />} />
             <Route path="/campanha/:id" element={<CampanhaPublica />} />
             <Route element={<Layout />}>
               <Route path="/" element={<Index />} />

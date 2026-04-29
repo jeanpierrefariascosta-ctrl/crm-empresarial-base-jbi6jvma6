@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-29T19:45:55.880Z",
+  "generatedAt": "2026-04-29T19:48:07.048Z",
   "collections": [
     {
       "name": "users",
@@ -121,7 +121,7 @@
           "autodateTriggers": ["onCreate", "onUpdate"]
         }
       ],
-      "indexes": []
+      "indexes": ["CREATE UNIQUE INDEX `idx_empresas_cnpj_unique` ON `empresas` (cnpj)"]
     },
     {
       "name": "clientes",
