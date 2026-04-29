@@ -1,239 +1,129 @@
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Bot, UserPlus } from 'lucide-react'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Checkbox } from '@/components/ui/checkbox'
-import { useToast } from '@/hooks/use-toast'
-import { useAuth } from '@/hooks/use-auth'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import pb from '@/lib/pocketbase/client'
+import { useToast } from '@/hooks/use-toast'
 
-interface Lead {
-  id: string
-  etapa_kanban: string
-  valor_previsto: number
-  probabilidade_fechamento: number
-  expand?: { cliente_id?: { razao_social: string; id: string } }
-  enriquecido?: boolean
-  responsavel_id?: string
-}
+const STAGES = ['prospecção', 'qualificação', 'proposta', 'negociação', 'fechamento', 'fechado']
 
-const STAGES = ['prospecção', 'qualificação', 'proposta', 'negociação', 'fechamento']
-
-export function KanbanBoard({ leads, onUpdate }: { leads: Lead[]; onUpdate: () => void }) {
-  const { user } = useAuth()
+export function KanbanBoard({ leads, onUpdate, onLeadClick }: any) {
+  const [draggedId, setDraggedId] = useState<string | null>(null)
   const { toast } = useToast()
-  const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null)
-  const [enrichingLead, setEnrichingLead] = useState<Lead | null>(null)
-  const [aiContacts, setAiContacts] = useState<any[]>([])
-  const [selectedContacts, setSelectedContacts] = useState<number[]>([])
-  const [isLoadingAi, setIsLoadingAi] = useState(false)
-
-  const handleDragStart = (e: React.DragEvent, id: string) => {
-    setDraggedLeadId(id)
-    e.dataTransfer.setData('leadId', id)
-    // Needed for Firefox
-    e.dataTransfer.effectAllowed = 'move'
-  }
-
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-  }
 
   const handleDrop = async (e: React.DragEvent, newStage: string) => {
     e.preventDefault()
-    const leadId = e.dataTransfer.getData('leadId') || draggedLeadId
-    setDraggedLeadId(null)
-    if (!leadId) return
+    const id = e.dataTransfer.getData('leadId') || draggedId
+    setDraggedId(null)
+    if (!id) return
 
-    const lead = leads.find((l) => l.id === leadId)
-    if (lead && lead.etapa_kanban !== newStage) {
-      try {
-        await pb.collection('leads').update(leadId, { etapa_kanban: newStage })
-        onUpdate()
-      } catch (error) {
-        console.error('Failed to update lead stage', error)
-      }
-    }
-  }
-
-  const handleEnrich = async (lead: Lead) => {
-    setEnrichingLead(lead)
-    setIsLoadingAi(true)
-    setAiContacts([])
-    setSelectedContacts([])
     try {
-      const res = await pb.send(`/backend/v1/enrich/lead/${lead.id}`, { method: 'POST' })
-      setAiContacts(res.contacts || [])
-    } catch (err: any) {
-      toast({ variant: 'destructive', title: 'Erro na IA', description: err.message })
-      setEnrichingLead(null)
-    } finally {
-      setIsLoadingAi(false)
-    }
-  }
-
-  const handleSaveContacts = async () => {
-    if (!enrichingLead) return
-    setIsLoadingAi(true)
-    try {
-      const contactsToSave = selectedContacts.map((i) => aiContacts[i])
-      for (const c of contactsToSave) {
-        await pb.collection('contatos').create({
-          empresa_id: user?.empresa_id,
-          cliente_id: enrichingLead.expand?.cliente_id?.id,
-          lead_id: enrichingLead.id,
-          nome: c.nome,
-          cargo: c.cargo,
-          linkedin_url: c.linkedin_url,
-        })
-        await pb.collection('tarefas').create({
-          empresa_id: user?.empresa_id,
-          titulo: `Contato Inicial com ${c.nome} (${c.cargo})`,
-          descricao: `Lead Enriquecido. URL: ${c.linkedin_url || ''}`,
-          status: 'aberta',
-          responsavel_id: enrichingLead.responsavel_id || user?.id,
-          cliente_id: enrichingLead.expand?.cliente_id?.id,
-        })
-      }
-      await pb.collection('leads').update(enrichingLead.id, { enriquecido: true })
-      toast({ title: 'Contatos e tarefas criadas com sucesso!' })
-      setEnrichingLead(null)
+      await pb.collection('leads').update(id, { etapa_kanban: newStage })
       onUpdate()
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Erro', description: e.message })
-    } finally {
-      setIsLoadingAi(false)
+      if (newStage === 'fechamento') {
+        toast({
+          title: 'Atenção',
+          description: 'Confirme o fechamento nos detalhes da oportunidade.',
+        })
+      }
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro',
+        description: 'Permissão negada ou erro na rede.',
+      })
     }
   }
 
   return (
-    <>
-      <Dialog open={!!enrichingLead} onOpenChange={(o) => !o && setEnrichingLead(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Enriquecimento com IA</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            {isLoadingAi && aiContacts.length === 0 ? (
-              <div className="flex items-center space-x-2 text-muted-foreground">
-                <Bot className="animate-bounce w-5 h-5" /> <span>Buscando contatos na web...</span>
-              </div>
-            ) : (
-              <>
-                <p className="text-sm">
-                  Foram encontrados os seguintes contatos potenciais. Selecione os que deseja
-                  adicionar ao CRM:
-                </p>
-                <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
-                  {aiContacts.map((c, i) => (
-                    <div
-                      key={i}
-                      className="flex items-center space-x-3 p-3 border rounded-md bg-muted/30"
-                    >
-                      <Checkbox
-                        checked={selectedContacts.includes(i)}
-                        onCheckedChange={(ch) => {
-                          if (ch) setSelectedContacts([...selectedContacts, i])
-                          else setSelectedContacts(selectedContacts.filter((x) => x !== i))
-                        }}
-                      />
-                      <div>
-                        <div className="font-medium text-sm">{c.nome}</div>
-                        <div className="text-xs text-muted-foreground">{c.cargo}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <Button
-                  className="w-full mt-4"
-                  disabled={selectedContacts.length === 0 || isLoadingAi}
-                  onClick={handleSaveContacts}
-                >
-                  <UserPlus className="w-4 h-4 mr-2" /> Adicionar Selecionados (
-                  {selectedContacts.length})
-                </Button>
-              </>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+    <div className="flex h-full gap-4 overflow-x-auto pb-4">
+      {STAGES.map((stage) => {
+        const stageLeads = leads.filter((l: any) => l.etapa_kanban === stage)
+        const total = stageLeads.reduce((sum: number, l: any) => sum + (l.valor_previsto || 0), 0)
 
-      <div className="flex h-[calc(100vh-12rem)] gap-4 overflow-x-auto pb-4">
-        {STAGES.map((stage) => {
-          const stageLeads = leads.filter((l) => l.etapa_kanban === stage)
-          const totalStage = stageLeads.reduce((acc, l) => acc + (l.valor_previsto || 0), 0)
-
-          return (
-            <div
-              key={stage}
-              className="flex w-80 flex-shrink-0 flex-col rounded-lg bg-muted/40 border border-border/50"
-              onDragOver={handleDragOver}
-              onDrop={(e) => handleDrop(e, stage)}
-            >
-              <div className="flex items-center justify-between p-4 border-b border-border/40 bg-background/50 rounded-t-lg">
-                <h3 className="font-semibold uppercase tracking-wider text-sm">{stage}</h3>
-                <Badge variant="secondary">{stageLeads.length}</Badge>
-              </div>
-              <div className="p-3 text-xs text-muted-foreground flex justify-between">
-                <span>Valor Total:</span>
-                <span className="font-medium text-foreground">
-                  {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
-                    totalStage,
-                  )}
-                </span>
-              </div>
-              <div className="flex-1 overflow-y-auto p-2 space-y-3">
-                {stageLeads.map((lead) => (
-                  <Card
-                    key={lead.id}
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, lead.id)}
-                    className="cursor-grab active:cursor-grabbing hover:shadow-md transition-shadow"
-                  >
-                    <CardHeader className="p-3 pb-1">
-                      <CardTitle className="text-sm line-clamp-1">
-                        {lead.expand?.cliente_id?.razao_social || 'Desconhecido'}
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0">
-                      <div className="flex justify-between items-center mt-2 text-xs">
-                        <span className="font-medium text-emerald-500">
-                          {new Intl.NumberFormat('pt-BR', {
-                            style: 'currency',
-                            currency: 'BRL',
-                            maximumFractionDigits: 0,
-                          }).format(lead.valor_previsto || 0)}
-                        </span>
-                        <Badge variant="outline" className="text-[10px] px-1 py-0">
-                          {lead.probabilidade_fechamento}%
-                        </Badge>
-                      </div>
-                      {stage === 'prospecção' && !lead.enriquecido && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="w-full mt-2 h-7 text-xs text-primary"
-                          onClick={() => handleEnrich(lead)}
-                        >
-                          <Bot className="w-3 h-3 mr-1" /> Enriquecer IA
-                        </Button>
-                      )}
-                      {lead.enriquecido && (
-                        <div className="mt-2 text-[10px] text-center text-muted-foreground flex items-center justify-center">
-                          <Bot className="w-3 h-3 mr-1 text-emerald-500" /> Enriquecido
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
+        return (
+          <div
+            key={stage}
+            className="flex w-[320px] flex-shrink-0 flex-col rounded-lg bg-muted/40 border border-border/50"
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => handleDrop(e, stage)}
+          >
+            <div className="p-3 border-b flex justify-between items-center bg-background/50 rounded-t-lg">
+              <h3 className="font-semibold uppercase text-xs tracking-wider text-foreground">
+                {stage}
+              </h3>
+              <Badge variant="secondary" className="px-2">
+                {stageLeads.length}
+              </Badge>
             </div>
-          )
-        })}
-      </div>
-    </>
+            <div className="px-3 py-2 text-xs text-muted-foreground flex justify-between bg-muted/20 border-b">
+              <span>Valor Total:</span>
+              <span className="font-medium text-foreground">
+                {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(
+                  total,
+                )}
+              </span>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2 space-y-3">
+              {stageLeads.map((lead: any) => (
+                <Card
+                  key={lead.id}
+                  draggable
+                  onDragStart={(e) => {
+                    setDraggedId(lead.id)
+                    e.dataTransfer.setData('leadId', lead.id)
+                  }}
+                  onClick={() => onLeadClick(lead.id)}
+                  className="cursor-pointer hover:border-primary transition-colors border-border/60 bg-card/80 backdrop-blur-sm shadow-sm"
+                >
+                  <CardHeader className="p-3 pb-1">
+                    <CardTitle className="text-[13px] leading-tight line-clamp-1">
+                      {lead.expand?.cliente_id?.razao_social}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-3 pt-0">
+                    <div className="flex justify-between items-center text-xs mt-1">
+                      <span className="font-medium text-emerald-500">
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                          maximumFractionDigits: 0,
+                        }).format(lead.valor_previsto || 0)}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] px-1.5 py-0 rounded-sm bg-background"
+                      >
+                        {lead.probabilidade_fechamento}%
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center mt-3">
+                      <span className="text-[10px] text-muted-foreground truncate max-w-[120px] uppercase font-medium">
+                        {lead.fonte_lead || 'Manual'}
+                      </span>
+                      <Avatar className="w-5 h-5 ring-1 ring-border">
+                        <AvatarImage
+                          src={
+                            lead.expand?.responsavel_id?.avatar
+                              ? pb.files.getUrl(
+                                  lead.expand.responsavel_id,
+                                  lead.expand.responsavel_id.avatar,
+                                )
+                              : ''
+                          }
+                        />
+                        <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
+                          {lead.expand?.responsavel_id?.name?.charAt(0) || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+    </div>
   )
 }

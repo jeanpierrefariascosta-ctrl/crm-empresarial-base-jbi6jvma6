@@ -1,5 +1,14 @@
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Users, Megaphone, FolderKanban, Settings } from 'lucide-react'
+import {
+  LayoutDashboard,
+  Users,
+  Megaphone,
+  FolderKanban,
+  Settings,
+  TrendingUp,
+  Calendar,
+  FileText,
+} from 'lucide-react'
 import {
   Sidebar,
   SidebarContent,
@@ -14,7 +23,10 @@ import {
 
 const navItems = [
   { title: 'Painel', url: '/', icon: LayoutDashboard },
-  { title: 'Leads (Kanban)', url: '/vendas/leads', icon: FolderKanban },
+  { title: 'Dashboard Vendas', url: '/vendas/dashboard', icon: TrendingUp },
+  { title: 'Pipeline (Kanban)', url: '/vendas/leads', icon: FolderKanban },
+  { title: 'Reuniões Agendadas', url: '/vendas/reunioes', icon: Calendar },
+  { title: 'Propostas', url: '/vendas/propostas', icon: FileText },
   { title: 'Clientes', url: '/vendas/clientes', icon: Users },
   { title: 'Marketing', url: '/marketing/campanhas', icon: Megaphone },
   { title: 'Projetos & Tarefas', url: '/projetos/tarefas', icon: FolderKanban },
