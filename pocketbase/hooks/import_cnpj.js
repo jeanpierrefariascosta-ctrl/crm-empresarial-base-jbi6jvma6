@@ -8,6 +8,19 @@ routerAdd(
 
     const cleanCnpj = cnpj.replace(/\D/g, '')
 
+    const logConsulta = (sucesso) => {
+      try {
+        const logsCol = $app.findCollectionByNameOrId('logs_consulta_cnpj')
+        const log = new Record(logsCol)
+        log.set('cnpj', cleanCnpj)
+        log.set('usuario_id', e.auth.id)
+        log.set('sucesso', sucesso)
+        $app.save(log)
+      } catch (err) {
+        console.log('Erro ao salvar log:', err)
+      }
+    }
+
     const res = $http.send({
       url: `https://brasilapi.com.br/api/cnpj/v1/${cleanCnpj}`,
       method: 'GET',
@@ -15,9 +28,11 @@ routerAdd(
     })
 
     if (res.statusCode !== 200) {
+      logConsulta(false)
       return e.badRequestError('CNPJ não encontrado na Receita Federal')
     }
 
+    logConsulta(true)
     const data = res.json
 
     return e.json(200, {
@@ -31,7 +46,7 @@ routerAdd(
       numero: data.numero || '',
       complemento: data.complemento || '',
       bairro: data.bairro || '',
-      municipio: data.municipio || '',
+      cidade: data.municipio || '',
       uf: data.uf || '',
     })
   },
