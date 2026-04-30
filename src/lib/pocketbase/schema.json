@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-30T06:19:27.172Z",
+  "generatedAt": "2026-04-30T06:31:20.609Z",
   "collections": [
     {
       "name": "users",
@@ -385,7 +385,7 @@
         {
           "name": "etapa_kanban",
           "type": "select",
-          "required": true,
+          "required": false,
           "system": false,
           "selectValues": [
             "prospecção",

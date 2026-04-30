@@ -17,10 +17,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ArrowRightCircle } from 'lucide-react'
+import { PromoteLeadModal } from './PromoteLeadModal'
+import { useAuth } from '@/hooks/use-auth'
 
 export function LeadDetailsSheet({ leadId, onClose, onUpdate }: any) {
   const [lead, setLead] = useState<any>(null)
+  const [promoteModalOpen, setPromoteModalOpen] = useState(false)
+  const { user } = useAuth() as any
+  const canPromote = ['admin', 'head', 'supervisor', 'cdr'].includes(user?.funcao || '')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -75,25 +80,41 @@ export function LeadDetailsSheet({ leadId, onClose, onUpdate }: any) {
           </div>
         ) : (
           <div className="space-y-4 mt-6">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Etapa</label>
-              <Select
-                value={lead.etapa_kanban}
-                onValueChange={(v) => setLead({ ...lead, etapa_kanban: v })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="prospecção">Prospecção</SelectItem>
-                  <SelectItem value="qualificação">Qualificação</SelectItem>
-                  <SelectItem value="proposta">Proposta</SelectItem>
-                  <SelectItem value="negociação">Negociação</SelectItem>
-                  <SelectItem value="fechamento">Fechamento</SelectItem>
-                  <SelectItem value="fechado">Fechado</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {!lead.etapa_kanban ? (
+              <div className="p-4 bg-muted rounded-md text-sm border flex flex-col gap-3">
+                <p>
+                  Este lead foi apenas capturado (Marketing) e ainda não está no Pipeline de Vendas.
+                </p>
+                <Button
+                  variant="default"
+                  onClick={() => setPromoteModalOpen(true)}
+                  disabled={!canPromote}
+                >
+                  <ArrowRightCircle className="w-4 h-4 mr-2" />
+                  Enviar para o Kanban
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Etapa</label>
+                <Select
+                  value={lead.etapa_kanban}
+                  onValueChange={(v) => setLead({ ...lead, etapa_kanban: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="prospecção">Prospecção</SelectItem>
+                    <SelectItem value="qualificação">Qualificação</SelectItem>
+                    <SelectItem value="proposta">Proposta</SelectItem>
+                    <SelectItem value="negociação">Negociação</SelectItem>
+                    <SelectItem value="fechamento">Fechamento</SelectItem>
+                    <SelectItem value="fechado">Fechado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-2">
               <label className="text-sm font-medium">Valor Previsto</label>
               <Input
@@ -122,6 +143,19 @@ export function LeadDetailsSheet({ leadId, onClose, onUpdate }: any) {
           </div>
         )}
       </SheetContent>
+
+      <PromoteLeadModal
+        lead={lead}
+        open={promoteModalOpen}
+        onOpenChange={setPromoteModalOpen}
+        onUpdate={() => {
+          fetchLead()
+          if (onUpdate) onUpdate()
+        }}
+        onViewKanban={() => {
+          onClose()
+        }}
+      />
     </Sheet>
   )
 }

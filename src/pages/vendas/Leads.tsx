@@ -5,21 +5,36 @@ import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, LayoutList, Kanban, Sparkles } from 'lucide-react'
+import { Search, LayoutList, Kanban, Sparkles, Building2 } from 'lucide-react'
 import { LeadDetailsSheet } from '@/components/vendas/LeadDetailsSheet'
 import { LeadEnrichmentModal } from '@/components/vendas/LeadEnrichmentModal'
+import { CnpjSearchModal } from '@/components/vendas/CnpjSearchModal'
+import { PromoteLeadModal } from '@/components/vendas/PromoteLeadModal'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
 
 export default function Leads() {
   const { selectedEmpresaId, user } = useAuth() as any
   const [leads, setLeads] = useState<any[]>([])
   const [search, setSearch] = useState('')
-  const [view, setView] = useState<'kanban' | 'list'>('kanban')
+  const [view, setView] = useState<'kanban' | 'list'>('list')
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
 
   const [enrichModalOpen, setEnrichModalOpen] = useState(false)
   const [enrichLeadId, setEnrichLeadId] = useState<string>('')
 
+  const [cnpjModalOpen, setCnpjModalOpen] = useState(false)
+  const [promoteLead, setPromoteLead] = useState<any>(null)
+
   const isSupervisor = ['supervisor', 'head', 'diretor', 'admin'].includes(user?.funcao || '')
+  const canPromote = ['admin', 'head', 'supervisor', 'cdr'].includes(user?.funcao || '')
 
   const fetchLeads = async () => {
     if (!selectedEmpresaId) return
@@ -27,6 +42,7 @@ export default function Leads() {
       const data = await pb.collection('leads').getFullList({
         filter: `empresa_id = "${selectedEmpresaId}"`,
         expand: 'cliente_id,responsavel_id',
+        sort: '-created',
       })
       setLeads(data)
     } catch (e) {
@@ -40,7 +56,9 @@ export default function Leads() {
   useRealtime('leads', () => fetchLeads())
 
   const filteredLeads = useMemo(() => {
-    let f = isSupervisor ? leads : leads.filter((l) => l.responsavel_id === user?.id)
+    let f = isSupervisor
+      ? leads
+      : leads.filter((l) => l.responsavel_id === user?.id || !l.etapa_kanban)
     if (search) {
       f = f.filter((l) =>
         l.expand?.cliente_id?.razao_social?.toLowerCase().includes(search.toLowerCase()),
@@ -48,6 +66,8 @@ export default function Leads() {
     }
     return f
   }, [leads, isSupervisor, user, search])
+
+  const kanbanLeads = useMemo(() => filteredLeads.filter((l) => !!l.etapa_kanban), [filteredLeads])
 
   const handleOpenEnrich = (leadId: string = '') => {
     setEnrichLeadId(leadId)
@@ -62,6 +82,9 @@ export default function Leads() {
           <p className="text-muted-foreground">Gerencie suas oportunidades de negócio.</p>
         </div>
         <div className="flex space-x-2">
+          <Button variant="outline" onClick={() => setCnpjModalOpen(true)}>
+            <Building2 className="w-4 h-4 mr-2" /> Buscar CNPJ
+          </Button>
           <Button
             variant="default"
             className="bg-yellow-500 hover:bg-yellow-600 text-white"
@@ -98,14 +121,73 @@ export default function Leads() {
       <div className="flex-1 overflow-hidden">
         {view === 'kanban' ? (
           <KanbanBoard
-            leads={filteredLeads}
+            leads={kanbanLeads}
             onUpdate={fetchLeads}
             onLeadClick={setSelectedLeadId}
             onEnrich={handleOpenEnrich}
           />
         ) : (
-          <div className="p-8 text-center border rounded-md bg-card text-muted-foreground">
-            Visualização em lista em desenvolvimento.
+          <div className="border rounded-md bg-card overflow-y-auto h-full">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Empresa</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Responsável</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredLeads.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                      Nenhum lead encontrado.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredLeads.map((lead) => (
+                    <TableRow key={lead.id}>
+                      <TableCell
+                        className="font-medium cursor-pointer hover:underline"
+                        onClick={() => setSelectedLeadId(lead.id)}
+                      >
+                        {lead.expand?.cliente_id?.razao_social || 'Sem empresa'}
+                      </TableCell>
+                      <TableCell>
+                        {lead.etapa_kanban ? (
+                          <Badge variant="default" className="bg-blue-500">
+                            No Pipeline: {lead.etapa_kanban}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">Apenas Capturado</Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {lead.expand?.responsavel_id?.name ||
+                          lead.expand?.responsavel_id?.nome_completo ||
+                          'Não atribuído'}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        {!lead.etapa_kanban && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setPromoteLead(lead)
+                            }}
+                            disabled={!canPromote}
+                            title={!canPromote ? 'Apenas gestores/vendas podem promover leads' : ''}
+                          >
+                            Enviar para o Kanban
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
           </div>
         )}
       </div>
@@ -124,6 +206,21 @@ export default function Leads() {
         initialLeadId={enrichLeadId}
         leads={filteredLeads}
         onUpdate={fetchLeads}
+      />
+
+      <CnpjSearchModal
+        open={cnpjModalOpen}
+        onOpenChange={setCnpjModalOpen}
+        onUpdate={fetchLeads}
+        onViewKanban={() => setView('kanban')}
+      />
+
+      <PromoteLeadModal
+        lead={promoteLead}
+        open={!!promoteLead}
+        onOpenChange={(open: boolean) => !open && setPromoteLead(null)}
+        onUpdate={fetchLeads}
+        onViewKanban={() => setView('kanban')}
       />
     </div>
   )
