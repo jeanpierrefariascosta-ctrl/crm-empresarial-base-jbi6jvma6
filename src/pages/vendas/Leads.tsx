@@ -5,15 +5,19 @@ import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, LayoutList, Kanban } from 'lucide-react'
+import { Search, LayoutList, Kanban, Sparkles } from 'lucide-react'
 import { LeadDetailsSheet } from '@/components/vendas/LeadDetailsSheet'
+import { LeadEnrichmentModal } from '@/components/vendas/LeadEnrichmentModal'
 
 export default function Leads() {
-  const { selectedEmpresaId, user } = useAuth()
+  const { selectedEmpresaId, user } = useAuth() as any
   const [leads, setLeads] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [view, setView] = useState<'kanban' | 'list'>('kanban')
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
+
+  const [enrichModalOpen, setEnrichModalOpen] = useState(false)
+  const [enrichLeadId, setEnrichLeadId] = useState<string>('')
 
   const isSupervisor = ['supervisor', 'head', 'diretor', 'admin'].includes(user?.funcao || '')
 
@@ -45,6 +49,11 @@ export default function Leads() {
     return f
   }, [leads, isSupervisor, user, search])
 
+  const handleOpenEnrich = (leadId: string = '') => {
+    setEnrichLeadId(leadId)
+    setEnrichModalOpen(true)
+  }
+
   return (
     <div className="space-y-6 h-full flex flex-col">
       <div className="flex items-center justify-between">
@@ -53,6 +62,13 @@ export default function Leads() {
           <p className="text-muted-foreground">Gerencie suas oportunidades de negócio.</p>
         </div>
         <div className="flex space-x-2">
+          <Button
+            variant="default"
+            className="bg-yellow-500 hover:bg-yellow-600 text-white"
+            onClick={() => handleOpenEnrich()}
+          >
+            <Sparkles className="w-4 h-4 mr-2" /> Enriquecer Lead
+          </Button>
           <div className="relative">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
@@ -85,6 +101,7 @@ export default function Leads() {
             leads={filteredLeads}
             onUpdate={fetchLeads}
             onLeadClick={setSelectedLeadId}
+            onEnrich={handleOpenEnrich}
           />
         ) : (
           <div className="p-8 text-center border rounded-md bg-card text-muted-foreground">
@@ -100,6 +117,14 @@ export default function Leads() {
           onUpdate={fetchLeads}
         />
       )}
+
+      <LeadEnrichmentModal
+        open={enrichModalOpen}
+        onOpenChange={setEnrichModalOpen}
+        initialLeadId={enrichLeadId}
+        leads={filteredLeads}
+        onUpdate={fetchLeads}
+      />
     </div>
   )
 }

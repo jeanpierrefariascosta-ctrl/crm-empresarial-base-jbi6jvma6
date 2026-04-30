@@ -1,15 +1,37 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import pb from '@/lib/pocketbase/client'
 import { useToast } from '@/hooks/use-toast'
+import { format } from 'date-fns'
+import { Sparkles, Eye, Users } from 'lucide-react'
 
 const STAGES = ['prospecção', 'qualificação', 'proposta', 'negociação', 'fechamento', 'fechado']
 
-export function KanbanBoard({ leads, onUpdate, onLeadClick }: any) {
+export function KanbanBoard({ leads, onUpdate, onLeadClick, onEnrich }: any) {
   const [draggedId, setDraggedId] = useState<string | null>(null)
+  const [contactsCount, setContactsCount] = useState<Record<string, number>>({})
   const { toast } = useToast()
+
+  useEffect(() => {
+    const fetchContacts = async () => {
+      try {
+        const res = await pb.collection('contatos').getList(1, 500, {
+          fields: 'lead_id',
+        })
+        const counts: Record<string, number> = {}
+        res.items.forEach((c) => {
+          if (c.lead_id) counts[c.lead_id] = (counts[c.lead_id] || 0) + 1
+        })
+        setContactsCount(counts)
+      } catch (e) {
+        // ignore
+      }
+    }
+    fetchContacts()
+  }, [leads])
 
   const handleDrop = async (e: React.DragEvent, newStage: string) => {
     e.preventDefault()
@@ -73,15 +95,43 @@ export function KanbanBoard({ leads, onUpdate, onLeadClick }: any) {
                     setDraggedId(lead.id)
                     e.dataTransfer.setData('leadId', lead.id)
                   }}
-                  onClick={() => onLeadClick(lead.id)}
-                  className="cursor-pointer hover:border-primary transition-colors border-border/60 bg-card/80 backdrop-blur-sm shadow-sm"
+                  className="cursor-pointer hover:border-primary transition-colors border-border/60 bg-card/80 backdrop-blur-sm shadow-sm group"
                 >
-                  <CardHeader className="p-3 pb-1">
-                    <CardTitle className="text-[13px] leading-tight line-clamp-1">
+                  <CardHeader className="p-3 pb-1 flex flex-row items-start justify-between space-y-0">
+                    <CardTitle
+                      className="text-[13px] leading-tight line-clamp-1 flex-1 pr-2"
+                      onClick={() => onLeadClick(lead.id)}
+                    >
                       {lead.expand?.cliente_id?.razao_social}
                     </CardTitle>
+                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {stage === 'prospecção' && !lead.enriquecido && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-5 w-5 text-yellow-500"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            onEnrich(lead.id)
+                          }}
+                        >
+                          <Sparkles className="h-3 w-3" />
+                        </Button>
+                      )}
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-5 w-5"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onLeadClick(lead.id)
+                        }}
+                      >
+                        <Eye className="h-3 w-3" />
+                      </Button>
+                    </div>
                   </CardHeader>
-                  <CardContent className="p-3 pt-0">
+                  <CardContent className="p-3 pt-0" onClick={() => onLeadClick(lead.id)}>
                     <div className="flex justify-between items-center text-xs mt-1">
                       <span className="font-medium text-emerald-500">
                         {new Intl.NumberFormat('pt-BR', {
@@ -90,32 +140,48 @@ export function KanbanBoard({ leads, onUpdate, onLeadClick }: any) {
                           maximumFractionDigits: 0,
                         }).format(lead.valor_previsto || 0)}
                       </span>
-                      <Badge
-                        variant="outline"
-                        className="text-[10px] px-1.5 py-0 rounded-sm bg-background"
-                      >
-                        {lead.probabilidade_fechamento}%
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] px-1.5 py-0 rounded-sm bg-background flex items-center gap-1"
+                        >
+                          <Users className="w-3 h-3" />
+                          {contactsCount[lead.id] || 0}
+                        </Badge>
+                      </div>
                     </div>
-                    <div className="flex justify-between items-center mt-3">
-                      <span className="text-[10px] text-muted-foreground truncate max-w-[120px] uppercase font-medium">
-                        {lead.fonte_lead || 'Manual'}
-                      </span>
-                      <Avatar className="w-5 h-5 ring-1 ring-border">
-                        <AvatarImage
-                          src={
-                            lead.expand?.responsavel_id?.avatar
-                              ? pb.files.getUrl(
-                                  lead.expand.responsavel_id,
-                                  lead.expand.responsavel_id.avatar,
-                                )
-                              : ''
-                          }
-                        />
-                        <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
-                          {lead.expand?.responsavel_id?.name?.charAt(0) || 'U'}
-                        </AvatarFallback>
-                      </Avatar>
+                    <div className="flex flex-col gap-2 mt-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-muted-foreground truncate max-w-[120px] uppercase font-medium">
+                          {lead.fonte_lead || 'Manual'}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {lead.created ? format(new Date(lead.created), 'dd/MM/yyyy') : ''}
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <Badge
+                          variant="secondary"
+                          className="text-[10px] px-1.5 py-0 font-normal bg-primary/10 text-primary"
+                        >
+                          {lead.probabilidade_fechamento}% Chance
+                        </Badge>
+                        <Avatar className="w-5 h-5 ring-1 ring-border">
+                          <AvatarImage
+                            src={
+                              lead.expand?.responsavel_id?.avatar
+                                ? pb.files.getUrl(
+                                    lead.expand.responsavel_id,
+                                    lead.expand.responsavel_id.avatar,
+                                  )
+                                : ''
+                            }
+                          />
+                          <AvatarFallback className="text-[8px] bg-primary/10 text-primary">
+                            {lead.expand?.responsavel_id?.name?.charAt(0) || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

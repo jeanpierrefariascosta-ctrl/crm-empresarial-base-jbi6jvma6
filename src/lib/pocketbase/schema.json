@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-30T05:53:33.236Z",
+  "generatedAt": "2026-04-30T06:19:27.172Z",
   "collections": [
     {
       "name": "users",
@@ -240,6 +240,36 @@
           "type": "json",
           "required": false,
           "system": false
+        },
+        {
+          "name": "nome_fantasia",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cnae",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_abertura",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "situacao",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "faturamento",
+          "type": "number",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -455,7 +485,7 @@
           "system": false
         }
       ],
-      "indexes": []
+      "indexes": ["CREATE INDEX `idx_leads_fonte` ON `leads` (fonte_lead)"]
     },
     {
       "name": "tarefas",
@@ -664,6 +694,31 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "rede_social",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["linkedin", "instagram"]
+        },
+        {
+          "name": "bio",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "foto_perfil",
+          "type": "url",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "origem_enriquecimento",
+          "type": "bool",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []

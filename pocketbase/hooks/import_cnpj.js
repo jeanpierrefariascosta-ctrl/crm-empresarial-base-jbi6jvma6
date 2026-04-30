@@ -49,6 +49,9 @@ routerAdd(
       cidade: data.municipio || '',
       uf: data.uf || '',
       qsa: data.qsa || [],
+      cnae: data.cnae_fiscal_descricao || '',
+      data_abertura: data.data_inicio_atividade || '',
+      situacao: data.descricao_situacao_cadastral || '',
     })
   },
   $apis.requireAuth(),

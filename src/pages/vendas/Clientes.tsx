@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, Plus, Loader2 } from 'lucide-react'
+import { Search, Plus, Loader2, Edit2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -52,10 +52,12 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { toast } from 'sonner'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { useNavigate } from 'react-router-dom'
 
 const formSchema = z.object({
   cnpj_cpf: z.string().optional(),
   razao_social: z.string().min(1, 'Razão Social é obrigatória'),
+  nome_fantasia: z.string().optional(),
   email: z.string().email('E-mail inválido').optional().or(z.literal('')),
   telefone: z.string().optional(),
   cep: z.string().optional(),
@@ -67,12 +69,17 @@ const formSchema = z.object({
   uf: z.string().optional(),
   status: z.enum(['ativo', 'inativo']).default('ativo'),
   socios: z.any().optional(),
+  cnae: z.string().optional(),
+  data_abertura: z.string().optional(),
+  situacao: z.string().optional(),
+  faturamento: z.number().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
 export default function Clientes() {
   const { user, selectedEmpresaId } = useAuth() as any
+  const navigate = useNavigate()
   const [clientes, setClientes] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [filterCidade, setFilterCidade] = useState('todas')
@@ -82,12 +89,14 @@ export default function Clientes() {
   const [buscandoCnpj, setBuscandoCnpj] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const [selectedCliente, setSelectedCliente] = useState<any>(null)
+  const [isEditMode, setIsEditMode] = useState(false)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       cnpj_cpf: '',
       razao_social: '',
+      nome_fantasia: '',
       email: '',
       telefone: '',
       cep: '',
@@ -99,6 +108,9 @@ export default function Clientes() {
       uf: '',
       status: 'ativo',
       socios: [],
+      cnae: '',
+      data_abertura: '',
+      situacao: '',
     },
   })
 
@@ -162,10 +174,9 @@ export default function Clientes() {
           shouldValidate: true,
           shouldDirty: true,
         })
-        if (data.email)
-          form.setValue('email', data.email, { shouldValidate: true, shouldDirty: true })
-        if (data.telefone)
-          form.setValue('telefone', data.telefone, { shouldValidate: true, shouldDirty: true })
+        if (data.email) form.setValue('email', data.email, { shouldValidate: true })
+        if (data.telefone) form.setValue('telefone', data.telefone, { shouldValidate: true })
+        if (data.fantasia) form.setValue('nome_fantasia', data.fantasia)
         if (data.cep) form.setValue('cep', data.cep)
         if (data.logradouro) form.setValue('logradouro', data.logradouro)
         if (data.numero) form.setValue('numero', data.numero)
@@ -174,16 +185,16 @@ export default function Clientes() {
         if (data.cidade) form.setValue('cidade', data.cidade)
         if (data.uf) form.setValue('uf', data.uf)
         if (data.qsa) form.setValue('socios', data.qsa)
+        if (data.cnae) form.setValue('cnae', data.cnae)
+        if (data.data_abertura) form.setValue('data_abertura', data.data_abertura)
+        if (data.situacao) form.setValue('situacao', data.situacao)
 
-        toast.success('Dados do CNPJ importados com sucesso!')
+        toast.success('Dados do CNPJ importados com sucesso! Revise e adicione ao CRM.')
       } else {
         toast.error('Nenhum dado retornado para este CNPJ.')
       }
     } catch (e: any) {
-      const errorMessage =
-        e?.response?.message ||
-        'Erro ao consultar CNPJ. Verifique o número ou tente novamente mais tarde.'
-      toast.error(errorMessage)
+      toast.error(e?.response?.message || 'Erro ao consultar CNPJ.')
     } finally {
       setBuscandoCnpj(false)
     }
@@ -191,17 +202,16 @@ export default function Clientes() {
 
   const handleVerDetalhes = (cliente: any) => {
     setSelectedCliente(cliente)
+    setIsEditMode(false)
     setDetailsOpen(true)
   }
 
-  const handleStatusChange = async (newStatus: string) => {
-    if (!selectedCliente) return
-    try {
-      await pb.collection('clientes').update(selectedCliente.id, { status: newStatus })
-      toast.success('Status atualizado com sucesso!')
-      setSelectedCliente({ ...selectedCliente, status: newStatus })
-    } catch (e) {
-      toast.error('Erro ao atualizar status.')
+  const handleEdit = () => {
+    if (selectedCliente) {
+      form.reset(selectedCliente)
+      setIsEditMode(true)
+      setDetailsOpen(false)
+      setOpen(true)
     }
   }
 
@@ -214,19 +224,56 @@ export default function Clientes() {
 
     setLoading(true)
     try {
-      const record = await pb.collection('clientes').create({
-        ...values,
-        empresa_id: selectedEmpresaId,
-        criado_por: userId,
-      })
-      toast.success('Cliente cadastrado com sucesso!', {
-        action: {
-          label: 'Ver Detalhes',
-          onClick: () => handleVerDetalhes(record),
-        },
-      })
+      let record
+      if (isEditMode && selectedCliente) {
+        record = await pb.collection('clientes').update(selectedCliente.id, values)
+        toast.success('Cliente atualizado com sucesso!')
+      } else {
+        record = await pb.collection('clientes').create({
+          ...values,
+          empresa_id: selectedEmpresaId,
+          criado_por: userId,
+        })
+
+        const lead = await pb.collection('leads').create({
+          empresa_id: selectedEmpresaId,
+          cliente_id: record.id,
+          etapa_kanban: 'prospecção',
+          fonte_lead: 'Receita Federal',
+          responsavel_id: userId,
+        })
+
+        if (values.socios && values.socios.length > 0) {
+          await Promise.all(
+            values.socios.map((socio: any) =>
+              pb.collection('contatos').create({
+                empresa_id: selectedEmpresaId,
+                cliente_id: record.id,
+                lead_id: lead.id,
+                nome: socio.nome_socio || socio.nome,
+                cargo: socio.qual_rep_legal || socio.qualificacao_socio || 'Sócio',
+              }),
+            ),
+          )
+        }
+
+        toast.success('Lead e contatos criados com sucesso!', {
+          action: {
+            label: 'Ver no Pipeline',
+            onClick: () => navigate('/vendas/leads'),
+          },
+          duration: 5000,
+        })
+      }
+
       setOpen(false)
       form.reset()
+      if (isEditMode) {
+        setSelectedCliente(record)
+        setDetailsOpen(true)
+      } else {
+        handleVerDetalhes(record)
+      }
     } catch (e: any) {
       const fieldErrors = extractFieldErrors(e)
       if (Object.keys(fieldErrors).length > 0) {
@@ -234,7 +281,7 @@ export default function Clientes() {
           form.setError(field as any, { type: 'manual', message: msg })
         })
       } else {
-        toast.error('Erro ao cadastrar cliente.')
+        toast.error('Erro ao salvar cliente.')
       }
     } finally {
       setLoading(false)
@@ -245,6 +292,7 @@ export default function Clientes() {
     setOpen(newOpen)
     if (!newOpen) {
       form.reset()
+      setIsEditMode(false)
     }
   }
 
@@ -255,8 +303,14 @@ export default function Clientes() {
           <h2 className="text-3xl font-bold tracking-tight">Clientes</h2>
           <p className="text-muted-foreground">Lista de clientes e contas.</p>
         </div>
-        <Button onClick={() => setOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> Novo Cliente
+        <Button
+          onClick={() => {
+            setIsEditMode(false)
+            setOpen(true)
+            form.reset()
+          }}
+        >
+          <Plus className="mr-2 h-4 w-4" /> Novo Cliente / CNPJ
         </Button>
       </div>
 
@@ -353,37 +407,45 @@ export default function Clientes() {
       </div>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-[600px] p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden">
           <DialogHeader className="p-6 pb-2">
-            <DialogTitle>Novo Cliente</DialogTitle>
+            <DialogTitle>{isEditMode ? 'Editar Cliente' : 'Novo Cliente & Lead'}</DialogTitle>
             <DialogDescription>
-              Cadastre um novo cliente. Utilize a busca por CNPJ para autopreencher.
+              {isEditMode
+                ? 'Atualize os dados do cliente.'
+                : 'Busque o CNPJ para preencher os dados automaticamente. Isso criará o cliente e um Lead em Prospecção.'}
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="max-h-[70vh]">
+          <ScrollArea className="max-h-[75vh]">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 p-6 pt-0">
                 <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="cnpj_cpf"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>CNPJ</FormLabel>
+                  {!isEditMode && (
+                    <div className="p-4 bg-muted/30 border rounded-lg flex flex-col sm:flex-row items-center gap-4">
+                      <div className="flex-1 space-y-2">
+                        <label className="text-sm font-medium">
+                          Buscar CNPJ na Receita Federal
+                        </label>
                         <div className="flex gap-2">
-                          <FormControl>
-                            <Input
-                              placeholder="00.000.000/0000-00"
-                              {...field}
-                              onChange={(e) => field.onChange(maskCnpj(e.target.value))}
-                            />
-                          </FormControl>
+                          <FormField
+                            control={form.control}
+                            name="cnpj_cpf"
+                            render={({ field }) => (
+                              <FormControl>
+                                <Input
+                                  placeholder="00.000.000/0000-00"
+                                  {...field}
+                                  onChange={(e) => field.onChange(maskCnpj(e.target.value))}
+                                  className="w-full"
+                                />
+                              </FormControl>
+                            )}
+                          />
                           <Button
                             type="button"
-                            variant="secondary"
                             onClick={buscarCnpj}
                             disabled={buscandoCnpj}
-                            className="w-[100px]"
+                            className="w-[120px]"
                           >
                             {buscandoCnpj ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
@@ -394,24 +456,57 @@ export default function Clientes() {
                             )}
                           </Button>
                         </div>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="razao_social"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Razão Social</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Nome da Empresa" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                      </div>
+                    </div>
+                  )}
+
+                  {isEditMode && (
+                    <FormField
+                      control={form.control}
+                      name="cnpj_cpf"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>CNPJ/CPF</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="00.000.000/0000-00"
+                              {...field}
+                              onChange={(e) => field.onChange(maskCnpj(e.target.value))}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
                   <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name="razao_social"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2 sm:col-span-1">
+                          <FormLabel>Razão Social</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Nome da Empresa" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="nome_fantasia"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2 sm:col-span-1">
+                          <FormLabel>Nome Fantasia</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Fantasia" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                     <FormField
                       control={form.control}
                       name="email"
@@ -438,12 +533,24 @@ export default function Clientes() {
                         </FormItem>
                       )}
                     />
+                    <FormField
+                      control={form.control}
+                      name="cnae"
+                      render={({ field }) => (
+                        <FormItem className="col-span-2">
+                          <FormLabel>Atividade Econômica (CNAE)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Descrição da Atividade" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
 
                   <div className="mt-6 mb-2">
-                    <h3 className="text-sm font-medium">Endereço</h3>
+                    <h3 className="text-sm font-medium border-b pb-1">Endereço</h3>
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -538,7 +645,7 @@ export default function Clientes() {
                   </Button>
                   <Button type="submit" disabled={loading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Salvar Cliente
+                    {isEditMode ? 'Salvar Alterações' : 'Adicionar ao CRM'}
                   </Button>
                 </DialogFooter>
               </form>
@@ -549,36 +656,41 @@ export default function Clientes() {
 
       <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
         <SheetContent className="sm:max-w-md overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle>Detalhes do Cliente</SheetTitle>
-            <SheetDescription>Informações completas do cliente.</SheetDescription>
+          <SheetHeader className="flex flex-row items-center justify-between pb-4">
+            <div>
+              <SheetTitle>Detalhes do Cliente</SheetTitle>
+              <SheetDescription>Informações completas do cliente.</SheetDescription>
+            </div>
+            <Button variant="outline" size="icon" onClick={handleEdit}>
+              <Edit2 className="h-4 w-4" />
+            </Button>
           </SheetHeader>
           {selectedCliente && (
-            <div className="space-y-4 mt-6 pb-8">
+            <div className="space-y-4 mt-2 pb-8">
               <div className="flex items-center justify-between">
-                <h3 className="font-medium text-lg">Informações Principais</h3>
-                <Select
-                  value={selectedCliente.status || 'ativo'}
-                  onValueChange={handleStatusChange}
+                <Badge
+                  variant={selectedCliente.status === 'inativo' ? 'secondary' : 'default'}
+                  className={selectedCliente.status !== 'inativo' ? 'bg-green-500' : ''}
                 >
-                  <SelectTrigger className="w-[120px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="ativo">Ativo</SelectItem>
-                    <SelectItem value="inativo">Inativo</SelectItem>
-                  </SelectContent>
-                </Select>
+                  {selectedCliente.status === 'inativo' ? 'Inativo' : 'Ativo'}
+                </Badge>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="col-span-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">Razão Social</h4>
+                  <h4 className="text-sm font-medium text-muted-foreground">
+                    Razão Social / Fantasia
+                  </h4>
                   <p className="text-base">{selectedCliente.razao_social}</p>
+                  <p className="text-sm text-muted-foreground">{selectedCliente.nome_fantasia}</p>
                 </div>
                 <div className="col-span-2">
                   <h4 className="text-sm font-medium text-muted-foreground">CNPJ / CPF</h4>
                   <p className="text-base">{selectedCliente.cnpj_cpf || '-'}</p>
+                </div>
+                <div className="col-span-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">CNAE</h4>
+                  <p className="text-sm">{selectedCliente.cnae || '-'}</p>
                 </div>
                 <div className="col-span-2">
                   <h4 className="text-sm font-medium text-muted-foreground">E-mail</h4>
@@ -591,34 +703,34 @@ export default function Clientes() {
               </div>
 
               <Separator className="my-4" />
-
-              <h3 className="font-medium text-lg">Endereço</h3>
-              <div className="grid grid-cols-2 gap-4">
+              <h3 className="font-medium text-lg">Endereço Completo</h3>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                 <div className="col-span-2">
-                  <h4 className="text-sm font-medium text-muted-foreground">Logradouro</h4>
-                  <p className="text-base">
-                    {selectedCliente.logradouro || '-'}
-                    {selectedCliente.numero ? `, ${selectedCliente.numero}` : ''}
-                  </p>
+                  <span className="text-sm text-muted-foreground">Logradouro: </span>
+                  <span className="text-sm">{selectedCliente.logradouro || '-'}</span>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">Complemento</h4>
-                  <p className="text-base">{selectedCliente.complemento || '-'}</p>
+                  <span className="text-sm text-muted-foreground">Número: </span>
+                  <span className="text-sm">{selectedCliente.numero || '-'}</span>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">Bairro</h4>
-                  <p className="text-base">{selectedCliente.bairro || '-'}</p>
+                  <span className="text-sm text-muted-foreground">Comp.: </span>
+                  <span className="text-sm">{selectedCliente.complemento || '-'}</span>
                 </div>
                 <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">Cidade / UF</h4>
-                  <p className="text-base">
+                  <span className="text-sm text-muted-foreground">Bairro: </span>
+                  <span className="text-sm">{selectedCliente.bairro || '-'}</span>
+                </div>
+                <div>
+                  <span className="text-sm text-muted-foreground">CEP: </span>
+                  <span className="text-sm">{selectedCliente.cep || '-'}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-sm text-muted-foreground">Cidade/UF: </span>
+                  <span className="text-sm">
                     {selectedCliente.cidade || '-'}
                     {selectedCliente.uf ? ` / ${selectedCliente.uf}` : ''}
-                  </p>
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-muted-foreground">CEP</h4>
-                  <p className="text-base">{selectedCliente.cep || '-'}</p>
+                  </span>
                 </div>
               </div>
 

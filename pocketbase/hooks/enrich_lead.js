@@ -17,9 +17,16 @@ routerAdd(
     const razaoSocial = cliente.getString('razao_social')
 
     const prompt = `Identifique 3 possíveis executivos ou contatos-chave (como Gerente de Vendas, Diretor de Marketing, CEO) para uma empresa brasileira chamada "${razaoSocial}".
-  Retorne APENAS um array JSON de objetos, com as chaves: "nome" (string), "cargo" (string), "linkedin_url" (string simulada).
+  Retorne APENAS um array JSON de objetos, com as chaves:
+  - "nome" (string)
+  - "cargo" (string)
+  - "linkedin_url" (string simulada)
+  - "instagram_url" (string simulada)
+  - "rede_social" (string, "linkedin" ou "instagram")
+  - "bio" (string curta)
+  - "foto_perfil" (use "https://img.usecurling.com/ppl/thumbnail?seed=" + um numero aleatorio de 1 a 1000)
   Seja realista nos nomes. Exemplo de retorno:
-  [{"nome": "Carlos Silva", "cargo": "Diretor Comercial", "linkedin_url": "https://linkedin.com/in/carlos-silva-ex"}]`
+  [{"nome": "Carlos Silva", "cargo": "Diretor Comercial", "linkedin_url": "https://linkedin.com/in/carlos-silva-ex", "instagram_url": "https://instagram.com/carlossilva", "rede_social": "linkedin", "bio": "Especialista em vendas B2B", "foto_perfil": "https://img.usecurling.com/ppl/thumbnail?seed=42"}]`
 
     const res = $http.send({
       url: 'https://router.skip.dev/llm/v1/chat/completions',
