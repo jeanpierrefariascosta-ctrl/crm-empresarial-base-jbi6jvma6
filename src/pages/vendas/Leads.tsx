@@ -5,7 +5,18 @@ import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Search, LayoutList, Kanban, Sparkles, Building2 } from 'lucide-react'
+import { Search, LayoutList, Kanban, Sparkles, Building2, Trash2 } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import { toast } from 'sonner'
 import { LeadDetailsSheet } from '@/components/vendas/LeadDetailsSheet'
 import { LeadEnrichmentModal } from '@/components/vendas/LeadEnrichmentModal'
 import { CnpjSearchModal } from '@/components/vendas/CnpjSearchModal'
@@ -32,6 +43,7 @@ export default function Leads() {
 
   const [cnpjModalOpen, setCnpjModalOpen] = useState(false)
   const [promoteLead, setPromoteLead] = useState<any>(null)
+  const [leadToDelete, setLeadToDelete] = useState<string | null>(null)
 
   const isSupervisor = ['supervisor', 'head', 'diretor', 'admin'].includes(user?.funcao || '')
   const canPromote = ['admin', 'head', 'supervisor', 'cdr'].includes(user?.funcao || '')
@@ -72,6 +84,18 @@ export default function Leads() {
   const handleOpenEnrich = (leadId: string = '') => {
     setEnrichLeadId(leadId)
     setEnrichModalOpen(true)
+  }
+
+  const handleDeleteLead = async () => {
+    if (!leadToDelete) return
+    try {
+      await pb.collection('leads').delete(leadToDelete)
+      toast.success('Lead excluído com sucesso.')
+      setLeadToDelete(null)
+      fetchLeads()
+    } catch (e) {
+      toast.error('Erro ao excluir lead')
+    }
   }
 
   return (
@@ -168,20 +192,35 @@ export default function Leads() {
                           'Não atribuído'}
                       </TableCell>
                       <TableCell className="text-right">
-                        {!lead.etapa_kanban && (
+                        <div className="flex items-center justify-end gap-2">
+                          {!lead.etapa_kanban && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setPromoteLead(lead)
+                              }}
+                              disabled={!canPromote}
+                              title={
+                                !canPromote ? 'Apenas gestores/vendas podem promover leads' : ''
+                              }
+                            >
+                              Enviar para o Kanban
+                            </Button>
+                          )}
                           <Button
-                            variant="outline"
-                            size="sm"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive h-8 w-8"
                             onClick={(e) => {
                               e.stopPropagation()
-                              setPromoteLead(lead)
+                              setLeadToDelete(lead.id)
                             }}
-                            disabled={!canPromote}
-                            title={!canPromote ? 'Apenas gestores/vendas podem promover leads' : ''}
                           >
-                            Enviar para o Kanban
+                            <Trash2 className="h-4 w-4" />
                           </Button>
-                        )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
@@ -222,6 +261,29 @@ export default function Leads() {
         onUpdate={fetchLeads}
         onViewKanban={() => setView('kanban')}
       />
+
+      <AlertDialog open={!!leadToDelete} onOpenChange={(o) => !o && setLeadToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Lead</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este lead? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDeleteLead()
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

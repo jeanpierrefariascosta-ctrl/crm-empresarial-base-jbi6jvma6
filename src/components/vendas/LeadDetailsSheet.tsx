@@ -17,9 +17,19 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Loader2, ArrowRightCircle } from 'lucide-react'
+import { Loader2, ArrowRightCircle, Trash2 } from 'lucide-react'
 import { PromoteLeadModal } from './PromoteLeadModal'
 import { useAuth } from '@/hooks/use-auth'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 export function LeadDetailsSheet({ leadId, onClose, onUpdate }: any) {
   const [lead, setLead] = useState<any>(null)
@@ -28,6 +38,8 @@ export function LeadDetailsSheet({ leadId, onClose, onUpdate }: any) {
   const canPromote = ['admin', 'head', 'supervisor', 'cdr'].includes(user?.funcao || '')
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [deleteAlertOpen, setDeleteAlertOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const fetchLead = async () => {
     setLoading(true)
@@ -45,6 +57,21 @@ export function LeadDetailsSheet({ leadId, onClose, onUpdate }: any) {
   useEffect(() => {
     if (leadId) fetchLead()
   }, [leadId])
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      await pb.collection('leads').delete(leadId)
+      toast.success('Lead excluído com sucesso.')
+      if (onUpdate) onUpdate()
+      onClose()
+    } catch (e) {
+      toast.error('Erro ao excluir lead')
+    } finally {
+      setDeleting(false)
+      setDeleteAlertOpen(false)
+    }
+  }
 
   const handleSave = async () => {
     setSaving(true)
@@ -139,10 +166,44 @@ export function LeadDetailsSheet({ leadId, onClose, onUpdate }: any) {
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Salvar Alterações
               </Button>
+              <Button
+                variant="destructive"
+                className="w-full mt-2"
+                onClick={() => setDeleteAlertOpen(true)}
+                disabled={deleting}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Excluir Lead
+              </Button>
             </div>
           </div>
         )}
       </SheetContent>
+
+      <AlertDialog open={deleteAlertOpen} onOpenChange={setDeleteAlertOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir Lead</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir este lead? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault()
+                handleDelete()
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+            >
+              {deleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <PromoteLeadModal
         lead={lead}

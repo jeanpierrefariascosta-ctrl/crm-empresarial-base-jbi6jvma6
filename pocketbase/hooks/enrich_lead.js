@@ -16,6 +16,11 @@ routerAdd(
 
     const razaoSocial = cliente.getString('razao_social')
 
+    const apiKey = $secrets.get('SKIP_LLM_KEY')
+    if (!apiKey) {
+      return e.badRequestError('SKIP_LLM_KEY_MISSING')
+    }
+
     const prompt = `Identifique 3 possíveis executivos ou contatos-chave (como Gerente de Vendas, Diretor de Marketing, CEO) para uma empresa brasileira chamada "${razaoSocial}".
   Retorne APENAS um array JSON de objetos, com as chaves:
   - "nome" (string)
@@ -32,7 +37,7 @@ routerAdd(
       url: 'https://router.skip.dev/llm/v1/chat/completions',
       method: 'POST',
       headers: {
-        Authorization: 'Bearer ' + $secrets.get('SKIP_LLM_KEY'),
+        Authorization: 'Bearer ' + apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
