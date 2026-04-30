@@ -108,7 +108,7 @@ export function LeadEnrichmentModal({
 
       await pb.collection('leads').update(lead.id, { enriquecido: true })
       toast.success(`${toAdd.length} contatos adicionados! Vendedor notificado.`)
-      onUpdate && onUpdate()
+      if (onUpdate) onUpdate()
       onOpenChange(false)
     } catch (e: any) {
       toast.error('Erro ao salvar contatos')
