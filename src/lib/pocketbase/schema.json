@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-29T20:00:59.736Z",
+  "generatedAt": "2026-04-30T04:34:37.102Z",
   "collections": [
     {
       "name": "users",
@@ -469,6 +469,57 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "projeto_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "projetos"
+        },
+        {
+          "name": "data_vencimento_planejada",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_conclusao_realizada",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "motivo_encerramento",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "concluida",
+            "falta_recurso",
+            "decisao_lider",
+            "bloqueio_externo",
+            "outro"
+          ]
+        },
+        {
+          "name": "observacao_encerramento",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "bloqueada_por",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "tarefas"
+        },
+        {
+          "name": "subtarefas",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": []
@@ -751,6 +802,258 @@
           "name": "autor_id",
           "type": "relation",
           "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "projeto_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "projetos"
+        },
+        {
+          "name": "tarefa_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "tarefas"
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "projetos",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && empresa_id = @request.auth.empresa_id",
+        "view": "@request.auth.id != '' && empresa_id = @request.auth.empresa_id",
+        "create": "@request.auth.id != '' && empresa_id = @request.auth.empresa_id",
+        "update": "@request.auth.id != '' && empresa_id = @request.auth.empresa_id",
+        "delete": "@request.auth.id != '' && empresa_id = @request.auth.empresa_id"
+      },
+      "fields": [
+        {
+          "name": "empresa_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "empresas"
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "cliente_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "clientes"
+        },
+        {
+          "name": "valor",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["backlog", "to_do", "in_progress", "review", "done", "suspended"]
+        },
+        {
+          "name": "data_inicio",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_fim_planejada",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_fim_realizada",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "responsavel_id",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "motivo_encerramento",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "concluida",
+            "falta_recurso",
+            "decisao_lider",
+            "bloqueio_externo",
+            "outro"
+          ]
+        },
+        {
+          "name": "observacao_encerramento",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "notificacoes",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && user_id = @request.auth.id",
+        "view": "@request.auth.id != '' && user_id = @request.auth.id",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != '' && user_id = @request.auth.id",
+        "delete": "@request.auth.id != '' && user_id = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "user_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "titulo",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "mensagem",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "lida",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tipo",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["info", "warning", "critical"]
+        },
+        {
+          "name": "link",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "name": "arquivos_projeto",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && empresa_id = @request.auth.empresa_id",
+        "view": "@request.auth.id != '' && empresa_id = @request.auth.empresa_id",
+        "create": "@request.auth.id != '' && empresa_id = @request.auth.empresa_id",
+        "update": "@request.auth.id != '' && empresa_id = @request.auth.empresa_id",
+        "delete": "@request.auth.id != '' && empresa_id = @request.auth.empresa_id"
+      },
+      "fields": [
+        {
+          "name": "empresa_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "empresas"
+        },
+        {
+          "name": "projeto_id",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "projetos"
+        },
+        {
+          "name": "nome",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "arquivo",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "resumo_ia",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "uploaded_by",
+          "type": "relation",
+          "required": false,
           "system": false,
           "collectionRef": "users"
         },

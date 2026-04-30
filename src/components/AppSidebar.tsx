@@ -8,6 +8,9 @@ import {
   TrendingUp,
   Calendar,
   FileText,
+  PieChart,
+  LayoutGrid,
+  CheckSquare,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -22,15 +25,14 @@ import {
 } from '@/components/ui/sidebar'
 
 const navItems = [
-  { title: 'Painel', url: '/', icon: LayoutDashboard },
+  { title: 'Painel Executivo', url: '/dashboard/executivo', icon: LayoutDashboard },
   { title: 'Dashboard Vendas', url: '/vendas/dashboard', icon: TrendingUp },
   { title: 'Pipeline (Kanban)', url: '/vendas/leads', icon: FolderKanban },
-  { title: 'Reuniões Agendadas', url: '/vendas/reunioes', icon: Calendar },
-  { title: 'Propostas', url: '/vendas/propostas', icon: FileText },
   { title: 'Clientes', url: '/vendas/clientes', icon: Users },
-  { title: 'Marketing', url: '/marketing/campanhas', icon: Megaphone },
-  { title: 'Projetos & Tarefas', url: '/projetos/tarefas', icon: FolderKanban },
-  { title: 'Configurações', url: '/configuracoes', icon: Settings },
+  { title: 'Marketing', url: '/marketing/dashboard', icon: Megaphone },
+  { title: 'Dashboard Projetos', url: '/projetos/dashboard', icon: PieChart },
+  { title: 'Kanban Projetos', url: '/projetos/kanban', icon: LayoutGrid },
+  { title: 'Tarefas', url: '/projetos/tarefas', icon: CheckSquare },
 ]
 
 export function AppSidebar() {
