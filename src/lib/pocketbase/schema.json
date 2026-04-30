@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-30T05:48:01.479Z",
+  "generatedAt": "2026-04-30T05:53:33.236Z",
   "collections": [
     {
       "name": "users",
@@ -227,9 +227,26 @@
           "type": "text",
           "required": false,
           "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["ativo", "inativo"]
+        },
+        {
+          "name": "socios",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
-      "indexes": []
+      "indexes": [
+        "CREATE INDEX `idx_clientes_cidade` ON `clientes` (cidade)",
+        "CREATE INDEX `idx_clientes_uf` ON `clientes` (uf)",
+        "CREATE INDEX `idx_clientes_status` ON `clientes` (status)"
+      ]
     },
     {
       "name": "campanhas_ads",

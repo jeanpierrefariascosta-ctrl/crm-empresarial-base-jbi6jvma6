@@ -39,6 +39,14 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Badge } from '@/components/ui/badge'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -57,6 +65,8 @@ const formSchema = z.object({
   bairro: z.string().optional(),
   cidade: z.string().optional(),
   uf: z.string().optional(),
+  status: z.enum(['ativo', 'inativo']).default('ativo'),
+  socios: z.any().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -65,6 +75,8 @@ export default function Clientes() {
   const { user, selectedEmpresaId } = useAuth() as any
   const [clientes, setClientes] = useState<any[]>([])
   const [search, setSearch] = useState('')
+  const [filterCidade, setFilterCidade] = useState('todas')
+  const [filterUf, setFilterUf] = useState('todas')
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [buscandoCnpj, setBuscandoCnpj] = useState(false)
@@ -85,6 +97,8 @@ export default function Clientes() {
       bairro: '',
       cidade: '',
       uf: '',
+      status: 'ativo',
+      socios: [],
     },
   })
 
@@ -109,9 +123,25 @@ export default function Clientes() {
     fetchClientes()
   })
 
-  const filteredClientes = clientes.filter((c) =>
-    c.razao_social?.toLowerCase().includes(search.toLowerCase()),
-  )
+  const uniqueUfs = Array.from(new Set(clientes.map((c) => c.uf).filter(Boolean))).sort()
+  const uniqueCidades = Array.from(
+    new Set(
+      clientes
+        .filter((c) => filterUf === 'todas' || c.uf === filterUf)
+        .map((c) => c.cidade)
+        .filter(Boolean),
+    ),
+  ).sort()
+
+  const filteredClientes = clientes.filter((c) => {
+    const matchSearch =
+      c.razao_social?.toLowerCase().includes(search.toLowerCase()) ||
+      c.cnpj_cpf?.includes(search) ||
+      c.email?.toLowerCase().includes(search.toLowerCase())
+    const matchUf = filterUf === 'todas' || c.uf === filterUf
+    const matchCidade = filterCidade === 'todas' || c.cidade === filterCidade
+    return matchSearch && matchUf && matchCidade
+  })
 
   const buscarCnpj = async () => {
     const cnpj = form.getValues('cnpj_cpf')?.replace(/\D/g, '')
@@ -143,6 +173,7 @@ export default function Clientes() {
         if (data.bairro) form.setValue('bairro', data.bairro)
         if (data.cidade) form.setValue('cidade', data.cidade)
         if (data.uf) form.setValue('uf', data.uf)
+        if (data.qsa) form.setValue('socios', data.qsa)
 
         toast.success('Dados do CNPJ importados com sucesso!')
       } else {
@@ -161,6 +192,17 @@ export default function Clientes() {
   const handleVerDetalhes = (cliente: any) => {
     setSelectedCliente(cliente)
     setDetailsOpen(true)
+  }
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!selectedCliente) return
+    try {
+      await pb.collection('clientes').update(selectedCliente.id, { status: newStatus })
+      toast.success('Status atualizado com sucesso!')
+      setSelectedCliente({ ...selectedCliente, status: newStatus })
+    } catch (e) {
+      toast.error('Erro ao atualizar status.')
+    }
   }
 
   const onSubmit = async (values: FormValues) => {
@@ -218,7 +260,7 @@ export default function Clientes() {
         </Button>
       </div>
 
-      <div className="flex items-center space-x-2">
+      <div className="flex flex-col sm:flex-row gap-2">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -228,6 +270,38 @@ export default function Clientes() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
+        <Select
+          value={filterUf}
+          onValueChange={(val) => {
+            setFilterUf(val)
+            setFilterCidade('todas')
+          }}
+        >
+          <SelectTrigger className="w-full sm:w-[140px]">
+            <SelectValue placeholder="UF" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas UFs</SelectItem>
+            {uniqueUfs.map((uf) => (
+              <SelectItem key={uf} value={uf}>
+                {uf}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterCidade} onValueChange={setFilterCidade}>
+          <SelectTrigger className="w-full sm:w-[200px]">
+            <SelectValue placeholder="Cidade" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todas">Todas Cidades</SelectItem>
+            {uniqueCidades.map((cidade) => (
+              <SelectItem key={cidade} value={cidade}>
+                {cidade}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       <div className="rounded-md border bg-card">
@@ -237,13 +311,14 @@ export default function Clientes() {
               <TableHead>Razão Social</TableHead>
               <TableHead>CNPJ/CPF</TableHead>
               <TableHead>E-mail</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {filteredClientes.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center h-24 text-muted-foreground">
+                <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
                   Nenhum cliente encontrado.
                 </TableCell>
               </TableRow>
@@ -253,6 +328,18 @@ export default function Clientes() {
                   <TableCell className="font-medium">{cliente.razao_social}</TableCell>
                   <TableCell>{cliente.cnpj_cpf || '-'}</TableCell>
                   <TableCell>{cliente.email || '-'}</TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={cliente.status === 'inativo' ? 'secondary' : 'default'}
+                      className={
+                        cliente.status !== 'inativo'
+                          ? 'bg-green-500 hover:bg-green-600 text-white'
+                          : ''
+                      }
+                    >
+                      {cliente.status === 'inativo' ? 'Inativo' : 'Ativo'}
+                    </Badge>
+                  </TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="sm" onClick={() => handleVerDetalhes(cliente)}>
                       Ver Detalhes
@@ -467,22 +554,40 @@ export default function Clientes() {
             <SheetDescription>Informações completas do cliente.</SheetDescription>
           </SheetHeader>
           {selectedCliente && (
-            <div className="space-y-4 mt-6">
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground">Razão Social</h4>
-                <p className="text-base">{selectedCliente.razao_social}</p>
+            <div className="space-y-4 mt-6 pb-8">
+              <div className="flex items-center justify-between">
+                <h3 className="font-medium text-lg">Informações Principais</h3>
+                <Select
+                  value={selectedCliente.status || 'ativo'}
+                  onValueChange={handleStatusChange}
+                >
+                  <SelectTrigger className="w-[120px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="ativo">Ativo</SelectItem>
+                    <SelectItem value="inativo">Inativo</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground">CNPJ / CPF</h4>
-                <p className="text-base">{selectedCliente.cnpj_cpf || '-'}</p>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground">E-mail</h4>
-                <p className="text-base">{selectedCliente.email || '-'}</p>
-              </div>
-              <div>
-                <h4 className="text-sm font-medium text-muted-foreground">Telefone</h4>
-                <p className="text-base">{selectedCliente.telefone || '-'}</p>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">Razão Social</h4>
+                  <p className="text-base">{selectedCliente.razao_social}</p>
+                </div>
+                <div className="col-span-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">CNPJ / CPF</h4>
+                  <p className="text-base">{selectedCliente.cnpj_cpf || '-'}</p>
+                </div>
+                <div className="col-span-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">E-mail</h4>
+                  <p className="text-base">{selectedCliente.email || '-'}</p>
+                </div>
+                <div className="col-span-2">
+                  <h4 className="text-sm font-medium text-muted-foreground">Telefone</h4>
+                  <p className="text-base">{selectedCliente.telefone || '-'}</p>
+                </div>
               </div>
 
               <Separator className="my-4" />
@@ -516,6 +621,25 @@ export default function Clientes() {
                   <p className="text-base">{selectedCliente.cep || '-'}</p>
                 </div>
               </div>
+
+              {Array.isArray(selectedCliente.socios) && selectedCliente.socios.length > 0 && (
+                <>
+                  <Separator className="my-4" />
+                  <h3 className="font-medium text-lg mb-2">Quadro Societário (QSA)</h3>
+                  <div className="space-y-3">
+                    {selectedCliente.socios.map((socio: any, idx: number) => (
+                      <div key={idx} className="bg-muted p-3 rounded-md flex flex-col">
+                        <span className="font-medium text-sm">
+                          {socio.nome_socio || socio.nome}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {socio.qual_rep_legal || socio.qualificacao_socio || 'Sócio'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
         </SheetContent>

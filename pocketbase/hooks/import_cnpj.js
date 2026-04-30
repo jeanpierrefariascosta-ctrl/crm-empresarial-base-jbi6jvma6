@@ -48,6 +48,7 @@ routerAdd(
       bairro: data.bairro || '',
       cidade: data.municipio || '',
       uf: data.uf || '',
+      qsa: data.qsa || [],
     })
   },
   $apis.requireAuth(),
