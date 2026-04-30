@@ -66,13 +66,7 @@ export function LeadEnrichmentModal({
       setSelected(new Set((res.contacts || []).map((_: any, i: number) => i)))
       toast.success('Contatos encontrados!')
     } catch (e: any) {
-      if (e.response?.message === 'SKIP_LLM_KEY_MISSING' || e.message === 'SKIP_LLM_KEY_MISSING') {
-        toast.error(
-          'Configuração necessária: Adicione a chave `SKIP_LLM_KEY` nos Secrets do Skip Cloud para habilitar o enriquecimento por IA.',
-        )
-      } else {
-        toast.error(e.response?.message || e.message || 'Erro ao enriquecer lead')
-      }
+      toast.error(e.response?.message || e.message || 'Erro ao enriquecer lead')
     } finally {
       setLoading(false)
     }

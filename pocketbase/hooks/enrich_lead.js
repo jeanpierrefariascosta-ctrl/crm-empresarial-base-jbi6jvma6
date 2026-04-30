@@ -10,7 +10,11 @@ routerAdd(
       return e.notFoundError('Lead não encontrado')
     }
 
-    $app.expandRecord(lead, ['cliente_id'], null)
+    try {
+      $app.expandRecord(lead, ['cliente_id'])
+    } catch (err) {
+      $app.logger().error('Erro expandRecord', 'err', String(err))
+    }
     const cliente = lead.expandedOne('cliente_id')
     if (!cliente) return e.badRequestError('Lead sem cliente vinculado')
 
@@ -18,7 +22,9 @@ routerAdd(
 
     const apiKey = $secrets.get('SKIP_LLM_KEY')
     if (!apiKey) {
-      return e.badRequestError('SKIP_LLM_KEY_MISSING')
+      return e.badRequestError(
+        'Configuração necessária: Adicione a chave `SKIP_LLM_KEY` nos Secrets do Skip Cloud para habilitar o enriquecimento por IA.',
+      )
     }
 
     const prompt = `Analise a empresa brasileira chamada "${razaoSocial}".
@@ -43,7 +49,12 @@ Retorne APENAS um objeto JSON com as chaves:
     })
 
     if (res.statusCode !== 200) {
-      return e.internalServerError('Falha na API de enriquecimento')
+      let errMsg = 'Falha na API de IA'
+      if (res.json && res.json.error && res.json.error.message) {
+        errMsg = res.json.error.message
+      }
+      $app.logger().error('IA Enrich Error', 'status', res.statusCode, 'error', errMsg)
+      return e.badRequestError(errMsg)
     }
 
     let contacts = []
@@ -56,7 +67,8 @@ Retorne APENAS um objeto JSON com as chaves:
       estrategia = content.estrategia || ''
       proximo_passo = content.proximo_passo || ''
     } catch (err) {
-      return e.internalServerError('Falha ao parsear dados gerados')
+      $app.logger().error('IA Enrich Parse Error', 'err', String(err))
+      return e.badRequestError('Falha ao parsear dados gerados pela IA')
     }
 
     try {
@@ -64,7 +76,10 @@ Retorne APENAS um objeto JSON com as chaves:
       lead.set('proximo_passo', proximo_passo)
       lead.set('enriquecido', true)
       $app.save(lead)
-    } catch (err) {}
+    } catch (err) {
+      $app.logger().error('IA Enrich Save Error', 'err', String(err))
+      return e.badRequestError('Falha ao salvar dados no lead')
+    }
 
     return e.json(200, { contacts, estrategia, proximo_passo })
   },
