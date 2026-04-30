@@ -95,34 +95,31 @@ export default function Clientes() {
     }
     setBuscandoCnpj(true)
     try {
-      let data
-      try {
-        // Tenta rota GET padrão
-        data = await pb.send(`/backend/v1/import_cnpj/${cnpj}`, { method: 'GET' })
-      } catch (_) {
-        try {
-          // Fallback para rota GET /cnpj/
-          data = await pb.send(`/backend/v1/cnpj/${cnpj}`, { method: 'GET' })
-        } catch (__) {
-          // Fallback final para POST
-          data = await pb.send(`/backend/v1/import_cnpj`, {
-            method: 'POST',
-            body: JSON.stringify({ cnpj }),
-            headers: { 'Content-Type': 'application/json' },
-          })
-        }
-      }
+      const data = await pb.send(`/backend/v1/import/cnpj`, {
+        method: 'POST',
+        body: JSON.stringify({ cnpj }),
+        headers: { 'Content-Type': 'application/json' },
+      })
 
-      if (data?.razao_social || data?.nome) {
-        form.setValue('razao_social', data.razao_social || data.nome || '')
-        if (data.email) form.setValue('email', data.email)
-        if (data.telefone) form.setValue('telefone', data.telefone)
+      if (data?.razao_social) {
+        form.setValue('razao_social', data.razao_social, {
+          shouldValidate: true,
+          shouldDirty: true,
+        })
+        if (data.email)
+          form.setValue('email', data.email, { shouldValidate: true, shouldDirty: true })
+        if (data.telefone)
+          form.setValue('telefone', data.telefone, { shouldValidate: true, shouldDirty: true })
+
         toast.success('Dados do CNPJ importados com sucesso!')
       } else {
         toast.error('Nenhum dado retornado para este CNPJ.')
       }
-    } catch (e) {
-      toast.error('Erro ao buscar CNPJ. Verifique o número ou tente novamente mais tarde.')
+    } catch (e: any) {
+      const errorMessage =
+        e?.response?.message ||
+        'Erro ao consultar CNPJ. Verifique o número ou tente novamente mais tarde.'
+      toast.error(errorMessage)
     } finally {
       setBuscandoCnpj(false)
     }
