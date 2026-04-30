@@ -21,17 +21,11 @@ routerAdd(
       return e.badRequestError('SKIP_LLM_KEY_MISSING')
     }
 
-    const prompt = `Identifique 3 possíveis executivos ou contatos-chave (como Gerente de Vendas, Diretor de Marketing, CEO) para uma empresa brasileira chamada "${razaoSocial}".
-  Retorne APENAS um array JSON de objetos, com as chaves:
-  - "nome" (string)
-  - "cargo" (string)
-  - "linkedin_url" (string simulada)
-  - "instagram_url" (string simulada)
-  - "rede_social" (string, "linkedin" ou "instagram")
-  - "bio" (string curta)
-  - "foto_perfil" (use "https://img.usecurling.com/ppl/thumbnail?seed=" + um numero aleatorio de 1 a 1000)
-  Seja realista nos nomes. Exemplo de retorno:
-  [{"nome": "Carlos Silva", "cargo": "Diretor Comercial", "linkedin_url": "https://linkedin.com/in/carlos-silva-ex", "instagram_url": "https://instagram.com/carlossilva", "rede_social": "linkedin", "bio": "Especialista em vendas B2B", "foto_perfil": "https://img.usecurling.com/ppl/thumbnail?seed=42"}]`
+    const prompt = `Analise a empresa brasileira chamada "${razaoSocial}".
+Retorne APENAS um objeto JSON com as chaves:
+- "contatos": array de 3 objetos de executivos ou contatos-chave (ex: Gerente de Vendas, Diretor de Marketing, CEO) com as chaves: "nome" (string), "cargo" (string), "linkedin_url" (string simulada), "instagram_url" (string simulada), "rede_social" ("linkedin" ou "instagram"), "bio" (string curta), "foto_perfil" (use "https://img.usecurling.com/ppl/thumbnail?seed=" + um numero aleatorio de 1 a 1000).
+- "estrategia": string com 2 a 3 frases com uma estratégia comercial para abordar essa empresa.
+- "proximo_passo": string com uma ação clara e recomendada como próximo passo de vendas.`
 
     const res = $http.send({
       url: 'https://router.skip.dev/llm/v1/chat/completions',
@@ -53,14 +47,26 @@ routerAdd(
     }
 
     let contacts = []
+    let estrategia = ''
+    let proximo_passo = ''
+
     try {
       const content = JSON.parse(res.json.choices[0].message.content)
-      contacts = Array.isArray(content) ? content : content.contatos || content.contacts || []
+      contacts = Array.isArray(content.contatos) ? content.contatos : []
+      estrategia = content.estrategia || ''
+      proximo_passo = content.proximo_passo || ''
     } catch (err) {
-      return e.internalServerError('Falha ao parsear contatos gerados')
+      return e.internalServerError('Falha ao parsear dados gerados')
     }
 
-    return e.json(200, { contacts })
+    try {
+      lead.set('estrategia', estrategia)
+      lead.set('proximo_passo', proximo_passo)
+      lead.set('enriquecido', true)
+      $app.save(lead)
+    } catch (err) {}
+
+    return e.json(200, { contacts, estrategia, proximo_passo })
   },
   $apis.requireAuth(),
 )

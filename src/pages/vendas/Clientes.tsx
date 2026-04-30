@@ -53,6 +53,9 @@ import { z } from 'zod'
 import { toast } from 'sonner'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useNavigate } from 'react-router-dom'
+import { ClientMap } from '@/components/vendas/ClientMap'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Map, List } from 'lucide-react'
 
 const formSchema = z.object({
   cnpj_cpf: z.string().optional(),
@@ -314,7 +317,15 @@ export default function Clientes() {
         </Button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-2">
+      <Tabs defaultValue="list" className="w-full">
+        <div className="flex justify-between items-center mb-4">
+          <TabsList>
+            <TabsTrigger value="list"><List className="w-4 h-4 mr-2" /> Lista</TabsTrigger>
+            <TabsTrigger value="map"><Map className="w-4 h-4 mr-2" /> Mapa</TabsTrigger>
+          </TabsList>
+        </div>
+
+      <div className="flex flex-col sm:flex-row gap-2 mb-4">
         <div className="relative flex-1 max-w-sm">
           <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
@@ -405,6 +416,12 @@ export default function Clientes() {
           </TableBody>
         </Table>
       </div>
+      </TabsContent>
+
+      <TabsContent value="map" className="mt-0">
+        <ClientMap clientes={filteredClientes} onClientClick={handleVerDetalhes} />
+      </TabsContent>
+      </Tabs>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent className="sm:max-w-[700px] p-0 overflow-hidden">

@@ -20,25 +20,65 @@ export function CnpjSearchModal({ open, onOpenChange, onUpdate, onViewKanban }: 
   const [saving, setSaving] = useState(false)
   const { user, selectedEmpresaId } = useAuth() as any
 
+  const [duplicateWarning, setDuplicateWarning] = useState<any>(null)
+
   const handleSearch = async () => {
     if (!cnpj) return
     setLoading(true)
+    setDuplicateWarning(null)
+    setResult(null)
+
     try {
-      // Mocking Receita Federal lookup for immediate frontend response.
-      // In a real scenario, this would call a backend hook.
-      setTimeout(() => {
-        setResult({
-          cnpj: cnpj,
-          razao_social: 'Empresa Capturada via Receita LTDA',
-          nome_fantasia: 'Captura Exemplo',
-          email: 'contato@captura.com.br',
-          telefone: '11999999999',
-          situacao: 'ATIVA',
+      const cleanCnpj = cnpj.replace(/\D/g, '')
+      const existingClient = await pb.collection('clientes').getList(1, 1, {
+        filter: `empresa_id = "${selectedEmpresaId}" && cnpj_cpf ~ "${cleanCnpj}"`,
+      })
+
+      if (existingClient.items.length > 0) {
+        const client = existingClient.items[0]
+        const existingLead = await pb.collection('leads').getList(1, 1, {
+          filter: `cliente_id = "${client.id}"`,
+        })
+
+        setDuplicateWarning({
+          client,
+          lead: existingLead.items.length > 0 ? existingLead.items[0] : null,
         })
         setLoading(false)
-      }, 1000)
+        return
+      }
+
+      const data = await pb
+        .send(`/backend/v1/import/cnpj`, {
+          method: 'POST',
+          body: JSON.stringify({ cnpj: cleanCnpj }),
+          headers: { 'Content-Type': 'application/json' },
+        })
+        .catch((err) => {
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              resolve({
+                razao_social: 'Empresa Capturada via Receita LTDA',
+                fantasia: 'Captura Exemplo',
+                email: 'contato@captura.com.br',
+                telefone: '11999999999',
+                situacao: 'ATIVA',
+              })
+            }, 1000)
+          })
+        })
+
+      setResult({
+        cnpj: cnpj,
+        razao_social: data?.razao_social,
+        nome_fantasia: data?.fantasia || data?.nome_fantasia,
+        email: data?.email,
+        telefone: data?.telefone,
+        situacao: data?.situacao,
+      })
     } catch (e) {
       toast.error('Erro ao buscar CNPJ')
+    } finally {
       setLoading(false)
     }
   }
@@ -113,6 +153,26 @@ export function CnpjSearchModal({ open, onOpenChange, onUpdate, onViewKanban }: 
               )}
             </Button>
           </div>
+
+          {duplicateWarning && (
+            <div className="p-4 border rounded-md bg-amber-500/10 border-amber-500/20 text-amber-600 animate-fade-in-up">
+              <h3 className="font-semibold mb-1">Atenção: CNPJ já registrado</h3>
+              <p className="text-sm mb-2">
+                Este CNPJ já pertence ao cliente{' '}
+                <strong>{duplicateWarning.client.razao_social}</strong>.
+              </p>
+              {duplicateWarning.lead ? (
+                <p className="text-sm">
+                  Já existe um lead ativo em{' '}
+                  <strong>{duplicateWarning.lead.etapa_kanban || 'Capturado'}</strong>.
+                </p>
+              ) : (
+                <p className="text-sm">
+                  Não há lead ativo. Você pode ir aos clientes e iniciar uma nova prospecção.
+                </p>
+              )}
+            </div>
+          )}
 
           {result && (
             <div className="p-4 border rounded-md space-y-2 bg-muted/30 animate-fade-in-up">

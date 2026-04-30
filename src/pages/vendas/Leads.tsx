@@ -44,6 +44,10 @@ export default function Leads() {
   const [cnpjModalOpen, setCnpjModalOpen] = useState(false)
   const [promoteLead, setPromoteLead] = useState<any>(null)
   const [leadToDelete, setLeadToDelete] = useState<string | null>(null)
+  const [selectedLeads, setSelectedLeads] = useState<Set<string>>(new Set())
+  const [bulkReassignOpen, setBulkReassignOpen] = useState(false)
+  const [users, setUsers] = useState<any[]>([])
+  const [newResponsavelId, setNewResponsavelId] = useState('')
 
   const isSupervisor = ['supervisor', 'head', 'diretor', 'admin'].includes(user?.funcao || '')
   const canPromote = ['admin', 'head', 'supervisor', 'cdr'].includes(user?.funcao || '')
@@ -64,6 +68,17 @@ export default function Leads() {
 
   useEffect(() => {
     fetchLeads()
+    const fetchUsers = async () => {
+      try {
+        const u = await pb
+          .collection('users')
+          .getFullList({ filter: `empresa_id = "${selectedEmpresaId}"` })
+        setUsers(u)
+      } catch {
+        /* intentionally ignored */
+      }
+    }
+    if (selectedEmpresaId) fetchUsers()
   }, [selectedEmpresaId])
   useRealtime('leads', () => fetchLeads())
 
@@ -92,9 +107,61 @@ export default function Leads() {
       await pb.collection('leads').delete(leadToDelete)
       toast.success('Lead excluído com sucesso.')
       setLeadToDelete(null)
+      setSelectedLeads((prev) => {
+        const next = new Set(prev)
+        next.delete(leadToDelete)
+        return next
+      })
       fetchLeads()
     } catch (e) {
       toast.error('Erro ao excluir lead')
+    }
+  }
+
+  const toggleLeadSelection = (id: string) => {
+    setSelectedLeads((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleAllLeads = () => {
+    if (selectedLeads.size === filteredLeads.length) {
+      setSelectedLeads(new Set())
+    } else {
+      setSelectedLeads(new Set(filteredLeads.map((l) => l.id)))
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    if (selectedLeads.size === 0) return
+    if (!confirm(`Tem certeza que deseja excluir ${selectedLeads.size} leads?`)) return
+    try {
+      await Promise.all(Array.from(selectedLeads).map((id) => pb.collection('leads').delete(id)))
+      toast.success(`${selectedLeads.size} leads excluídos com sucesso.`)
+      setSelectedLeads(new Set())
+      fetchLeads()
+    } catch (e) {
+      toast.error('Erro ao excluir leads')
+    }
+  }
+
+  const handleBulkReassign = async () => {
+    if (!newResponsavelId || selectedLeads.size === 0) return
+    try {
+      await Promise.all(
+        Array.from(selectedLeads).map((id) =>
+          pb.collection('leads').update(id, { responsavel_id: newResponsavelId }),
+        ),
+      )
+      toast.success(`${selectedLeads.size} leads transferidos com sucesso.`)
+      setBulkReassignOpen(false)
+      setSelectedLeads(new Set())
+      fetchLeads()
+    } catch (e) {
+      toast.error('Erro ao transferir leads')
     }
   }
 
@@ -155,6 +222,21 @@ export default function Leads() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <input
+                      type="checkbox"
+                      className="rounded border-gray-300"
+                      checked={
+                        selectedLeads.size > 0 && selectedLeads.size === filteredLeads.length
+                      }
+                      ref={(input) => {
+                        if (input)
+                          input.indeterminate =
+                            selectedLeads.size > 0 && selectedLeads.size < filteredLeads.length
+                      }}
+                      onChange={toggleAllLeads}
+                    />
+                  </TableHead>
                   <TableHead>Empresa</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Responsável</TableHead>
@@ -164,13 +246,25 @@ export default function Leads() {
               <TableBody>
                 {filteredLeads.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       Nenhum lead encontrado.
                     </TableCell>
                   </TableRow>
                 ) : (
                   filteredLeads.map((lead) => (
-                    <TableRow key={lead.id}>
+                    <TableRow
+                      key={lead.id}
+                      className={selectedLeads.has(lead.id) ? 'bg-muted/50' : ''}
+                    >
+                      <TableCell>
+                        <input
+                          type="checkbox"
+                          className="rounded border-gray-300"
+                          checked={selectedLeads.has(lead.id)}
+                          onChange={() => toggleLeadSelection(lead.id)}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </TableCell>
                       <TableCell
                         className="font-medium cursor-pointer hover:underline"
                         onClick={() => setSelectedLeadId(lead.id)}
@@ -231,6 +325,20 @@ export default function Leads() {
         )}
       </div>
 
+      {selectedLeads.size > 0 && view === 'list' && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 bg-popover border shadow-lg rounded-full px-6 py-3 flex items-center gap-4 animate-slide-up z-50">
+          <span className="text-sm font-medium">{selectedLeads.size} leads selecionados</span>
+          <div className="flex items-center gap-2 border-l pl-4">
+            <Button variant="outline" size="sm" onClick={() => setBulkReassignOpen(true)}>
+              Transferir
+            </Button>
+            <Button variant="destructive" size="sm" onClick={handleBulkDelete}>
+              Excluir
+            </Button>
+          </div>
+        </div>
+      )}
+
       {selectedLeadId && (
         <LeadDetailsSheet
           leadId={selectedLeadId}
@@ -261,6 +369,39 @@ export default function Leads() {
         onUpdate={fetchLeads}
         onViewKanban={() => setView('kanban')}
       />
+
+      <Dialog open={bulkReassignOpen} onOpenChange={setBulkReassignOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Transferir Leads</DialogTitle>
+            <DialogDescription>
+              Selecione o novo responsável para os {selectedLeads.size} leads selecionados.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <select
+              className="w-full flex h-10 items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+              value={newResponsavelId}
+              onChange={(e) => setNewResponsavelId(e.target.value)}
+            >
+              <option value="">Selecione um usuário...</option>
+              {users.map((u) => (
+                <option key={u.id} value={u.id}>
+                  {u.name || u.nome_completo}
+                </option>
+              ))}
+            </select>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkReassignOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleBulkReassign} disabled={!newResponsavelId}>
+              Transferir
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!leadToDelete} onOpenChange={(o) => !o && setLeadToDelete(null)}>
         <AlertDialogContent>
