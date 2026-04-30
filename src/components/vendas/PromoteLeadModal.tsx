@@ -37,11 +37,13 @@ export function PromoteLeadModal({ lead, open, onOpenChange, onUpdate, onViewKan
         {
           action: {
             label: 'Ver no Kanban',
-            onClick: () => onViewKanban && onViewKanban(),
+            onClick: () => {
+              if (onViewKanban) onViewKanban()
+            },
           },
         },
       )
-      onUpdate && onUpdate()
+      if (onUpdate) onUpdate()
       onOpenChange(false)
     } catch (e) {
       toast.error('Erro ao promover lead')

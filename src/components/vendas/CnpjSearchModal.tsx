@@ -69,10 +69,12 @@ export function CnpjSearchModal({ open, onOpenChange, onUpdate, onViewKanban }: 
       toast.success(`Lead ${result.razao_social} adicionado à coluna prospecção com sucesso!`, {
         action: {
           label: 'Ver no Kanban',
-          onClick: () => onViewKanban && onViewKanban(),
+          onClick: () => {
+            if (onViewKanban) onViewKanban()
+          },
         },
       })
-      onUpdate && onUpdate()
+      if (onUpdate) onUpdate()
       onOpenChange(false)
       setResult(null)
       setCnpj('')
