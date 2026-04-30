@@ -320,107 +320,116 @@ export default function Clientes() {
       <Tabs defaultValue="list" className="w-full">
         <div className="flex justify-between items-center mb-4">
           <TabsList>
-            <TabsTrigger value="list"><List className="w-4 h-4 mr-2" /> Lista</TabsTrigger>
-            <TabsTrigger value="map"><Map className="w-4 h-4 mr-2" /> Mapa</TabsTrigger>
+            <TabsTrigger value="list">
+              <List className="w-4 h-4 mr-2" /> Lista
+            </TabsTrigger>
+            <TabsTrigger value="map">
+              <Map className="w-4 h-4 mr-2" /> Mapa
+            </TabsTrigger>
           </TabsList>
         </div>
 
-      <div className="flex flex-col sm:flex-row gap-2 mb-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Buscar clientes..."
-            className="pl-8"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
-        </div>
-        <Select
-          value={filterUf}
-          onValueChange={(val) => {
-            setFilterUf(val)
-            setFilterCidade('todas')
-          }}
-        >
-          <SelectTrigger className="w-full sm:w-[140px]">
-            <SelectValue placeholder="UF" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas UFs</SelectItem>
-            {uniqueUfs.map((uf) => (
-              <SelectItem key={uf} value={uf}>
-                {uf}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={filterCidade} onValueChange={setFilterCidade}>
-          <SelectTrigger className="w-full sm:w-[200px]">
-            <SelectValue placeholder="Cidade" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todas">Todas Cidades</SelectItem>
-            {uniqueCidades.map((cidade) => (
-              <SelectItem key={cidade} value={cidade}>
-                {cidade}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
+        <TabsContent value="list" className="mt-0">
+          <div className="flex flex-col sm:flex-row gap-2 mb-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Buscar clientes..."
+                className="pl-8"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <Select
+              value={filterUf}
+              onValueChange={(val) => {
+                setFilterUf(val)
+                setFilterCidade('todas')
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-[140px]">
+                <SelectValue placeholder="UF" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas UFs</SelectItem>
+                {uniqueUfs.map((uf) => (
+                  <SelectItem key={uf} value={uf}>
+                    {uf}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={filterCidade} onValueChange={setFilterCidade}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Cidade" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="todas">Todas Cidades</SelectItem>
+                {uniqueCidades.map((cidade) => (
+                  <SelectItem key={cidade} value={cidade}>
+                    {cidade}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-      <div className="rounded-md border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Razão Social</TableHead>
-              <TableHead>CNPJ/CPF</TableHead>
-              <TableHead>E-mail</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead className="text-right">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredClientes.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
-                  Nenhum cliente encontrado.
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredClientes.map((cliente) => (
-                <TableRow key={cliente.id}>
-                  <TableCell className="font-medium">{cliente.razao_social}</TableCell>
-                  <TableCell>{cliente.cnpj_cpf || '-'}</TableCell>
-                  <TableCell>{cliente.email || '-'}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={cliente.status === 'inativo' ? 'secondary' : 'default'}
-                      className={
-                        cliente.status !== 'inativo'
-                          ? 'bg-green-500 hover:bg-green-600 text-white'
-                          : ''
-                      }
-                    >
-                      {cliente.status === 'inativo' ? 'Inativo' : 'Ativo'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="sm" onClick={() => handleVerDetalhes(cliente)}>
-                      Ver Detalhes
-                    </Button>
-                  </TableCell>
+          <div className="rounded-md border bg-card">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Razão Social</TableHead>
+                  <TableHead>CNPJ/CPF</TableHead>
+                  <TableHead>E-mail</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Ações</TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-      </TabsContent>
+              </TableHeader>
+              <TableBody>
+                {filteredClientes.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
+                      Nenhum cliente encontrado.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredClientes.map((cliente) => (
+                    <TableRow key={cliente.id}>
+                      <TableCell className="font-medium">{cliente.razao_social}</TableCell>
+                      <TableCell>{cliente.cnpj_cpf || '-'}</TableCell>
+                      <TableCell>{cliente.email || '-'}</TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={cliente.status === 'inativo' ? 'secondary' : 'default'}
+                          className={
+                            cliente.status !== 'inativo'
+                              ? 'bg-green-500 hover:bg-green-600 text-white'
+                              : ''
+                          }
+                        >
+                          {cliente.status === 'inativo' ? 'Inativo' : 'Ativo'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleVerDetalhes(cliente)}
+                        >
+                          Ver Detalhes
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </TabsContent>
 
-      <TabsContent value="map" className="mt-0">
-        <ClientMap clientes={filteredClientes} onClientClick={handleVerDetalhes} />
-      </TabsContent>
+        <TabsContent value="map" className="mt-0">
+          <ClientMap clientes={filteredClientes} onClientClick={handleVerDetalhes} />
+        </TabsContent>
       </Tabs>
 
       <Dialog open={open} onOpenChange={handleOpenChange}>
